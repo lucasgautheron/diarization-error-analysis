@@ -1,10 +1,12 @@
+#!/usr/bin/env python3
+
 from ChildProject.projects import ChildProject
 from ChildProject.annotations import AnnotationManager
 from ChildProject.metrics import segments_to_annotation
 
 import datalad.api
 from os.path import join as opj
-from os.path import basename
+from os.path import basename, exists
 import pandas as pd
 from pyannote.core import Annotation, Segment, Timeline
 
@@ -133,14 +135,14 @@ def compute_counts(parameters):
         )
     )
 
+if not exists('counts.csv'):
+    annotators = pd.read_csv('input/annotators.csv')
+    annotators['path'] = annotators['corpus'].apply(lambda c: opj('input', c))
+    counts = pd.concat([compute_counts(annotator) for annotator in annotators.to_dict(orient = 'records')])
+    counts = counts.fillna(0)
+    counts.to_csv('counts.csv')
 
-annotators = pd.read_csv('input/annotators.csv')
-annotators['path'] = annotators['corpus'].apply(lambda c: opj('input', c))
-counts = pd.concat([compute_counts(annotator) for annotator in annotators.to_dict(orient = 'records')])
-counts = counts.fillna(0)
-counts.to_csv('counts.csv')
-
-counts = counts.read_csv('counts.csv')
+counts = pd.read_csv('counts.csv', header=[0,1,2])
 truth = np.transpose([counts['count']['truth'][speaker].values for speaker in ['CHI', 'OCH', 'FEM', 'MAL']]).astype(int)
 vtc = np.transpose([counts['count']['vtc'][speaker].values for speaker in ['CHI', 'OCH', 'FEM', 'MAL']]).astype(int)
 
@@ -168,8 +170,8 @@ data = {
 }
 
 print(f"clips: {data['n_clips']}")
-print("true vocs: {}".format(np.sum(truth)))
-print("vtc vocs: {}".format(np.sum(vtc)))
+print("true vocs: {}".format(np.sum(data['truth'])))
+print("vtc vocs: {}".format(np.sum(data['vtc'])))
 
 plt.scatter(data['truth'][:,0]+np.random.normal(0,0.1,truth.shape[0]), data['vtc'][:,0]+np.random.normal(0,0.1,truth.shape[0]))
 plt.scatter(data['truth'][:,1]+np.random.normal(0,0.1,truth.shape[0]), data['vtc'][:,1]+np.random.normal(0,0.1,truth.shape[0]))
@@ -232,11 +234,6 @@ model {
     }
 }
 """
-
-init = {
-    'alphas': np.full((truth.shape[1], truth.shape[1]), 1.01),
-    'betas': np.full((truth.shape[1], truth.shape[1]), 1.01)
-}
 
 num_chains = 4
 
