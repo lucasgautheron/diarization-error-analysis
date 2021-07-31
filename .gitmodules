@@ -13,3 +13,7 @@
 	url = git@gin.g-node.org:/LAAC-LSCP/png2019.git
 	datalad-id = 3450d8e0-8da1-472d-8f10-192c9007eaee
 	datalad-url = git@gin.g-node.org:/LAAC-LSCP/tsimane2017.git
+[submodule "input/tsimane2017"]
+	path = input/tsimane2017
+	url = git@gin.g-node.org:/LAAC-LSCP/tsimane2017.git
+	datalad-id = 5acde0e8-1e8e-4da3-86ea-92baace24d57
