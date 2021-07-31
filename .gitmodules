@@ -8,3 +8,7 @@
 	url = git@gin.g-node.org:/LAAC-LSCP/vanuatu.git
 	datalad-id = e6789925-03aa-490a-b832-db7dd64da7b5
 	datalad-url = git@gin.g-node.org:/LAAC-LSCP/vanuatu.git
+[submodule "input/solomon"]
+	path = input/solomon
+	url = git@gin.g-node.org:/LAAC-LSCP/solomon.git
+	datalad-id = e9dbf182-7566-453c-b0d3-2e2faf439526
