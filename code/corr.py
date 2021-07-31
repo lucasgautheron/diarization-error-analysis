@@ -141,8 +141,9 @@ if not exists('counts.csv'):
     counts = pd.concat([compute_counts(annotator) for annotator in annotators.to_dict(orient = 'records')])
     counts = counts.fillna(0)
     counts.to_csv('counts.csv')
+else:
+    counts = pd.read_csv('counts.csv', header=[0,1,2])
 
-counts = pd.read_csv('counts.csv', header=[0,1,2])
 truth = np.transpose([counts['count']['truth'][speaker].values for speaker in ['CHI', 'OCH', 'FEM', 'MAL']]).astype(int)
 vtc = np.transpose([counts['count']['vtc'][speaker].values for speaker in ['CHI', 'OCH', 'FEM', 'MAL']]).astype(int)
 
