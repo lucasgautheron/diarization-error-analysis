@@ -39,10 +39,10 @@ def compute_counts(parameters):
     intersection = AnnotationManager.intersection(
         am.annotations, ['vtc', annotator]
     )
-    intersection['onset'] = intersection.apply(lambda r: np.arange(r['range_onset'], r['range_offset'], 10000), axis = 1)
+    intersection['onset'] = intersection.apply(lambda r: np.arange(r['range_onset'], r['range_offset'], 15000), axis = 1)
     intersection = intersection.explode('onset')
     intersection['range_onset'] = intersection['onset']
-    intersection['range_offset'] = (intersection['range_onset']+10000).clip(upper = intersection['range_offset'])
+    intersection['range_offset'] = (intersection['range_onset']+15000).clip(upper = intersection['range_offset'])
 
     intersection['path'] = intersection.apply(
         lambda r: opj(project.path, 'annotations', r['set'], 'converted', r['annotation_filename']),
@@ -138,7 +138,9 @@ annotators = pd.read_csv('input/annotators.csv')
 annotators['path'] = annotators['corpus'].apply(lambda c: opj('input', c))
 counts = pd.concat([compute_counts(annotator) for annotator in annotators.to_dict(orient = 'records')])
 counts = counts.fillna(0)
+counts.to_csv('counts.csv')
 
+counts = counts.read_csv('counts.csv')
 truth = np.transpose([counts['count']['truth'][speaker].values for speaker in ['CHI', 'OCH', 'FEM', 'MAL']]).astype(int)
 vtc = np.transpose([counts['count']['vtc'][speaker].values for speaker in ['CHI', 'OCH', 'FEM', 'MAL']]).astype(int)
 
@@ -164,6 +166,10 @@ data = {
     'truth': truth.astype(int),
     'vtc': vtc.astype(int)
 }
+
+print(f"clips: {data['n_clips']}")
+print("true vocs: {}".format(np.sum(truth)))
+print("vtc vocs: {}".format(np.sum(vtc)))
 
 plt.scatter(data['truth'][:,0]+np.random.normal(0,0.1,truth.shape[0]), data['vtc'][:,0]+np.random.normal(0,0.1,truth.shape[0]))
 plt.scatter(data['truth'][:,1]+np.random.normal(0,0.1,truth.shape[0]), data['vtc'][:,1]+np.random.normal(0,0.1,truth.shape[0]))
@@ -232,7 +238,7 @@ init = {
     'betas': np.full((truth.shape[1], truth.shape[1]), 1.01)
 }
 
-num_chains = 2
+num_chains = 4
 
 posterior = stan.build(stan_code, data = data)
 fit = posterior.sample(num_chains = num_chains, num_samples = 4000)
