@@ -4,25 +4,15 @@ from ChildProject.projects import ChildProject
 from ChildProject.annotations import AnnotationManager
 from ChildProject.metrics import segments_to_annotation
 
-import argparse
-
 import datalad.api
 from os.path import join as opj
 from os.path import basename, exists
-
 import multiprocessing as mp
-
-import numpy as np
 import pandas as pd
 from pyannote.core import Annotation, Segment, Timeline
 
 import stan
-
-parser = argparse.ArgumentParser(description = 'model3')
-parser.add_argument('--group', default = 'child', choices = ['corpus', 'child'])
-parser.add_argument('--chains', default = 4, type = int)
-parser.add_argument('--samples', default = 5000, type = int)
-args = parser.parse_args()
+import numpy as np
 
 def extrude(self, removed, mode: str = 'intersection'):
     if isinstance(removed, Segment):
@@ -113,48 +103,27 @@ def compute_counts(parameters):
 stan_code = """
 data {
   int<lower=1> n_clips;   // number of clips
-  int<lower=1> n_groups; // number of groups
   int<lower=1> n_classes; // number of classes
-  int group[n_clips];
   int vtc[n_clips,n_classes,n_classes];
   int truth[n_clips,n_classes];
 }
 
 parameters {
-  matrix<lower=0,upper=1>[n_classes,n_classes] mus;
-  matrix<lower=0>[n_classes,n_classes] logetas;
-  matrix<lower=0,upper=1>[n_classes,n_classes] group_confusion[n_groups];
-}
-
-transformed parameters {
-  matrix<lower=0>[n_classes,n_classes] alphas;
-  matrix<lower=0>[n_classes,n_classes] betas;
-
-  alphas = mus * exp(logetas);
-  betas = (1-mus) * exp(logetas);
+  matrix<lower=0,upper=1>[n_classes,n_classes] confusion;
 }
 
 model {
     for (k in 1:n_clips) {
         for (i in 1:n_classes) {
             for (j in 1:n_classes) {
-                vtc[k,i,j] ~ binomial(truth[k,j], group_confusion[group[k],j,i]);
+                vtc[k,i,j] ~ binomial(truth[k,j], confusion[j,i]);
             }
         }
     }
 
     for (i in 1:n_classes) {
         for (j in 1:n_classes) {
-            mus[i,j] ~ beta(1,1);
-            logetas[i,j] ~ logistic(log(75), 1);
-        }
-    }
-
-    for (c in 1:n_groups) {
-        for (i in 1:n_classes) {
-            for (j in 1:n_classes) {
-                group_confusion[c,i,j] ~ beta(alphas[i,j], betas[i,j]);
-            }
+            confusion[i,j] ~ uniform(0,1);
         }
     }
 }
@@ -177,18 +146,17 @@ if __name__ == "__main__":
     data = {
         'n_clips': truth.shape[0],
         'n_classes': truth.shape[1],
-        'n_groups': data[args.group].nunique(),
-        'group': 1+data[args.group].astype('category').cat.codes.values,
         'truth': truth.astype(int),
         'vtc': vtc.astype(int)
     }
 
     print(f"clips: {data['n_clips']}")
-    print(f"groups: {data['n_groups']}")
     print("true vocs: {}".format(np.sum(data['truth'])))
     print("vtc vocs: {}".format(np.sum(data['vtc'])))
 
+    num_chains = 4
+
     posterior = stan.build(stan_code, data = data)
-    fit = posterior.sample(num_chains = args.chains, num_samples = args.samples)
+    fit = posterior.sample(num_chains = num_chains, num_samples = 5000)
     df = fit.to_frame()
     df.to_csv('fit.csv')
