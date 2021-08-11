@@ -128,7 +128,7 @@ def generate_stats(parameters):
     return stats
     
 if __name__ == '__main__':
-    annotators = pd.read_csv('input/annotators.csv')[0:1]
+    annotators = pd.read_csv('input/annotators.csv')[0:2]
     annotators['path'] = annotators['corpus'].apply(lambda c: opj('input', c))
     stats = [generate_stats(annotator) for annotator in annotators.to_dict(orient = 'records')]
     stats = sum(stats, [])
