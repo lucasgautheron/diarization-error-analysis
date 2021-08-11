@@ -6,12 +6,13 @@ from ChildProject.metrics import segments_to_annotation
 
 import datalad.api
 from functools import partial
+import librosa
 import multiprocessing as mp
+import numpy as np
 from os.path import join as opj
 from os.path import basename, exists, splitext
 import pandas as pd
-
-import numpy as np
+import soundfile
 
 def extrude(self, removed, mode: str = 'intersection'):
     if isinstance(removed, Segment):

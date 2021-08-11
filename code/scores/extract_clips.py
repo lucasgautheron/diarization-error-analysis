@@ -5,11 +5,12 @@ from ChildProject.annotations import AnnotationManager
 from ChildProject.metrics import segments_to_annotation
 
 import datalad.api
+import librosa
+import numpy as np
 from os.path import join as opj
 from os.path import basename, exists, splitext
 import pandas as pd
-
-import numpy as np
+import soundfile
 
 def extract_clips(parameters):
     annotator = parameters['annotator']
