@@ -6,7 +6,7 @@ from ChildProject.metrics import segments_to_annotation
 
 import datalad.api
 from os.path import join as opj
-from os.path import basename, exists
+from os.path import basename, exists, splitext
 import pandas as pd
 
 import numpy as np

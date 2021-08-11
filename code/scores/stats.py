@@ -8,7 +8,7 @@ import datalad.api
 from functools import partial
 import multiprocessing as mp
 from os.path import join as opj
-from os.path import basename, exists
+from os.path import basename, exists, splitext
 import pandas as pd
 
 import numpy as np
