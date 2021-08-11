@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import pandas as pd
 import numpy as np
 
@@ -45,7 +47,7 @@ def set_size(width, fraction=1, ratio = None):
     return fig_width_in, fig_height_in
 
 
-fit = pd.read_csv('fit.csv')
+fit = pd.read_parquet('fit.parquet')
 
 fig = plt.figure(figsize=set_size(450, 1, 1))
 axes = [fig.add_subplot(4,4,i+1) for i in range(4*4)]
@@ -58,8 +60,10 @@ for i in range(4*4):
     col = i%4+1
     label = f'{row}.{col}'
 
-    data = np.hstack([fit[f'group_confusion.{k}.{label}'].dropna().values for k in range(1,6)])
-
+    data = np.hstack([fit[f'alphas.{k}.{label}']/(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,59)])
+    #data = np.hstack([(fit[f'group_mus.{k}.{label}']).values for k in range(1,59)])
+    #data = fit[f'mus.{label}'].values    
+  
     ax.set_xticks([])
     ax.set_xticklabels([])
     ax.set_yticks([])
@@ -87,6 +91,7 @@ for i in range(4*4):
     ax.axvline(np.mean(data), linestyle = '--', linewidth = 0.5, color = '#333', alpha = 1)
     ax.text(0.5, 4.5, f'{low:.2f} - {high:.2f}', ha = 'center', va = 'center')
 
+fig.suptitle("$\mu_{eff}$ distribution")
 fig.subplots_adjust(wspace = 0, hspace = 0)
-plt.savefig('confusion.pdf')
+plt.savefig('mu_eff.pdf')
 plt.show()

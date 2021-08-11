@@ -45,7 +45,7 @@ def set_size(width, fraction=1, ratio = None):
     return fig_width_in, fig_height_in
 
 
-fit = pd.read_csv('fit.csv')
+fit = pd.read_csv('filtered.csv')
 
 fig = plt.figure(figsize=set_size(450, 1, 1))
 axes = [fig.add_subplot(4,4,i+1) for i in range(4*4)]
@@ -86,5 +86,5 @@ for i in range(4*4):
     ax.text(0.5, 4.5, f'{low:.2f} - {high:.2f}', ha = 'center', va = 'center')
 
 fig.subplots_adjust(wspace = 0, hspace = 0)
-plt.savefig('confusion_fit.pdf')
+plt.savefig('confusion_fit_full.pdf')
 plt.show()

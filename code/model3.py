@@ -122,7 +122,7 @@ data {
 
 parameters {
   matrix<lower=0,upper=1>[n_classes,n_classes] mus;
-  matrix<lower=0>[n_classes,n_classes] logetas;
+  matrix<lower=1>[n_classes,n_classes] etas;
   matrix<lower=0,upper=1>[n_classes,n_classes] group_confusion[n_groups];
 }
 
@@ -130,8 +130,8 @@ transformed parameters {
   matrix<lower=0>[n_classes,n_classes] alphas;
   matrix<lower=0>[n_classes,n_classes] betas;
 
-  alphas = mus * exp(logetas);
-  betas = (1-mus) * exp(logetas);
+  alphas = mus * etas;
+  betas = (1-mus) * etas;
 }
 
 model {
@@ -146,7 +146,7 @@ model {
     for (i in 1:n_classes) {
         for (j in 1:n_classes) {
             mus[i,j] ~ beta(1,1);
-            logetas[i,j] ~ logistic(log(75), 1);
+            etas[i,j] ~ pareto(1,1.5);
         }
     }
 

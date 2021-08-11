@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import pandas as pd
 import numpy as np
 
@@ -47,7 +49,7 @@ def set_size(width, fraction=1, ratio = None):
     return fig_width_in, fig_height_in
 
 
-fit = pd.read_csv('fit.csv')
+fit = pd.read_parquet('fit.parquet')
 
 fig = plt.figure(figsize=set_size(450, 1, 1))
 axes = [fig.add_subplot(4,4,i+1) for i in range(4*4)]
@@ -60,11 +62,15 @@ for i in range(4*4):
     col = i%4+1
     label = f'{row}.{col}'
 
+    mus = np.hstack([fit[f'alphas.{k}.{label}']/(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,59)])
+    etas = np.hstack([(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,59)])
+    etas = np.log10(etas)
+
     ax.set_xticks([])
     ax.set_xticklabels([])
     ax.set_yticks([])
     ax.set_yticklabels([])
-    ax.set_ylim(0,5)
+    ax.set_ylim(0,3)
     ax.set_xlim(0,1)
 
     if row == 1:
@@ -77,10 +83,17 @@ for i in range(4*4):
         ax.set_xticklabels(np.linspace(0.25,1,3, endpoint = False))
 
     if col == 1:
-        ax.set_yticks([2.5])
+        ax.set_yticks([1.5])
         ax.set_yticklabels([speakers[row-1]])
+    
+    if col == 4:
+        ax.yaxis.tick_right()
+        ax.set_yticks(np.arange(1,3))
+        ax.set_yticklabels([f'10$^{i}' for i in np.arange(1,3)])
 
-    sns.kdeplot(fit[f'mus.{label}'], fit[f'logetas.{label}'], shade=True, cmap="viridis", ax = ax)
+    #sns.kdeplot(fit[f'mus.{label}'], fit[f'etas.{label}'].apply(np.log), shade=True, cmap="viridis", ax = ax)
+    kplt = sns.kdeplot(mus, etas, shade=True, cmap="viridis", ax = ax)
+    kplt.set(xlabel = None, ylabel = None)
 
 
 fig.subplots_adjust(wspace = 0, hspace = 0)

@@ -41,7 +41,7 @@ def compute_counts(parameters):
 
     segments = am.get_collapsed_segments(intersection)
     segments = segments.merge(project.recordings[['recording_filename', 'child_id']], how = 'left')
-    segments['child'] = corpus + '_' + segments['child_id']
+    segments['child'] = corpus + '_' + segments['child_id'].astype(str)
 
     segments = segments[segments['speaker_type'].isin(speakers)]
 
@@ -62,7 +62,6 @@ def compute_counts(parameters):
     )
 
 annotators = pd.read_csv('input/annotators.csv')
-annotators = annotators[0:1]
 annotators['path'] = annotators['corpus'].apply(lambda c: opj('input', c))
 counts = pd.concat([compute_counts(annotator) for annotator in annotators.to_dict(orient = 'records')])
 counts = counts.fillna(0)
@@ -127,8 +126,8 @@ parameters {
 }
 
 transformed parameters {
-  matrix<lower=1>[n_classes,n_classes] alphas;
-  matrix<lower=1>[n_classes,n_classes] betas;
+  matrix<lower=0>[n_classes,n_classes] alphas;
+  matrix<lower=0>[n_classes,n_classes] betas;
 
   matrix[n_clips, n_classes] log_lik;
   log_lik = rep_matrix(0, n_clips, n_classes);
@@ -167,8 +166,8 @@ model {
 
     for (i in 1:n_classes) {
         for (j in 1:n_classes) {
-            mus[i,j] ~ uniform(0,1);
-            logetas[i,j] ~ logistic(log(100), 1);
+            mus[i,j] ~ beta(2,2);
+            logetas[i,j] ~ logistic(log(10), 1);
         }
     }
 
