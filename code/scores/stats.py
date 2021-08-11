@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# find ../../data/solomon-ana/output/clips -maxdepth 1 -type f -exec sbatch -c 2 --mem 1G -o vtc ./apply.sh {} --device=cpu \;
 
 from ChildProject.projects import ChildProject
 from ChildProject.annotations import AnnotationManager
@@ -35,27 +36,19 @@ def process_clip(am, annotator, clip):
     speakers = ['CHI', 'OCH', 'FEM', 'MAL']
     vtc_speakers = ['KCHI', 'CHI', 'FEM', 'MAL']
 
-    print('reading scores...')
-
     data = None
     for i, speaker in enumerate(vtc_speakers):
         signal, sr = librosa.load(
             clip_path + f'/{speaker}.wav',
-            sr = 16000,
-            offset = 2,
-            duration = (range_offset-range_onset)/1000
+            sr = None
         )
-        print(pd.DataFrame(signal).describe())
+        time_scale = len(signal)/(range_offset-range_onset+4000)
+        signal = signal[int(2000*time_scale):-int(2000*time_scale)]
+
         if data is not None:
             data = np.vstack((data, signal))
         else:
             data = signal
-
-    print('done.')
-
-    print(data.shape)
-    time_scale = data.shape[1]/(range_offset-range_onset)
-    print(time_scale)
 
     segments = am.get_segments(ann)
     if not len(segments):
@@ -67,15 +60,11 @@ def process_clip(am, annotator, clip):
         for speaker in speakers
     }
     
-    print(vtc)
-
     truth = {
         speaker: segments_to_annotation(segments[(segments['set'] == annotator) & (segments['speaker_type'] == speaker)], 'speaker_type').get_timeline()
         for speaker in speakers
     }
     
-    print(truth)
-
     stats = {}
     for i, speaker_A in enumerate(speakers):
         vtc[f'{speaker_A}_vocs_explained'] = vtc[speaker_A].crop(truth[speaker_A], mode = 'loose')
@@ -86,17 +75,12 @@ def process_clip(am, annotator, clip):
             vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = vtc[f'{speaker_A}_vocs_fp'].crop(truth[speaker_B], mode = 'loose')
 
         s = []
-        for explained in vtc[speaker_A]:
+        for explained in vtc[f'{speaker_A}_vocs_explained']:
             onset, offset = explained
             onset -= range_onset
             offset -= range_onset
-
-            print(speaker_A, onset, offset)
-            print(data[i, int(onset*time_scale):int(offset*time_scale)])
-            print(np.mean(data[i, int(onset*time_scale):int(offset*time_scale)]))
             
             s.append(np.mean(data[i, int(onset*time_scale):int(offset*time_scale)]))
-
         stats[f'{speaker_A}_vocs_explained'] = s
 
         for j, speaker_B in enumerate(speakers):
@@ -109,13 +93,10 @@ def process_clip(am, annotator, clip):
                 offset -= range_onset
 
                 sA.append(np.mean(data[i, int(onset*time_scale):int(offset*time_scale)]))
-                sA.append(np.mean(data[j, int(onset*time_scale):int(offset*time_scale)]))
-
+                sB.append(np.mean(data[j, int(onset*time_scale):int(offset*time_scale)]))
 
             stats[f'{speaker_A}_vocs_fp_{speaker_B}_false'] = sA
             stats[f'{speaker_A}_vocs_fp_{speaker_B}_true'] = sB
-
-    print(stats)
 
     return stats
     
@@ -147,7 +128,26 @@ def generate_stats(parameters):
     return stats
     
 if __name__ == '__main__':
-    annotators = pd.read_csv('input/annotators.csv')
+    annotators = pd.read_csv('input/annotators.csv')[0:1]
     annotators['path'] = annotators['corpus'].apply(lambda c: opj('input', c))
     stats = [generate_stats(annotator) for annotator in annotators.to_dict(orient = 'records')]
+    stats = sum(stats, [])
 
+    combined = {}
+
+    for k in stats[0].keys():
+        combined[k] = []
+        for s in stats:
+            if s is None:
+                continue
+            combined[k] += s[k]
+
+    for k in combined.keys():
+        if len(combined[k]) == 0:
+            continue
+        print(k,
+            np.mean(combined[k]),
+            np.quantile(combined[k], 0.1),
+            np.quantile(combined[k], 0.9),
+            len(combined[k])
+        )

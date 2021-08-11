@@ -39,7 +39,7 @@ def extract_clips(parameters):
             clip['recording_path'],
             sr = 16000,
             offset = (onset-2000)/1000,
-            duration = (offset-onset+2000)/1000
+            duration = (offset-onset+4000)/1000
         )
 
         output = f'output/clips/{bn}_{onset}_{offset}.wav'
