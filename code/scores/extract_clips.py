@@ -41,7 +41,7 @@ def extract_clips(parameters):
             duration = (offset-onset+2000)/1000
         )
 
-        output = f'output/clips/{bn}_{onset}_{offset}'
+        output = f'output/clips/{bn}_{onset}_{offset}.wav'
         soundfile.write(output, signal, 16000)
 
     return clips
