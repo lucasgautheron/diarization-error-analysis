@@ -21,7 +21,7 @@ import stan
 parser = argparse.ArgumentParser(description = 'model3')
 parser.add_argument('--group', default = 'child', choices = ['corpus', 'child'])
 parser.add_argument('--chains', default = 4, type = int)
-parser.add_argument('--samples', default = 5000, type = int)
+parser.add_argument('--samples', default = 2000, type = int)
 args = parser.parse_args()
 
 def extrude(self, removed, mode: str = 'intersection'):
@@ -123,15 +123,26 @@ data {
 parameters {
   matrix<lower=0,upper=1>[n_classes,n_classes] mus;
   matrix<lower=1>[n_classes,n_classes] etas;
+
+  matrix<lower=0,upper=1>[n_classes,n_classes] group_mus[n_groups];
+  matrix<lower=1>[n_classes,n_classes] group_etas[n_groups];
+
   matrix<lower=0,upper=1>[n_classes,n_classes] group_confusion[n_groups];
+
 }
 
 transformed parameters {
-  matrix<lower=0>[n_classes,n_classes] alphas;
-  matrix<lower=0>[n_classes,n_classes] betas;
+  matrix<lower=0>[n_classes,n_classes] alphas[n_groups];
+  matrix<lower=0>[n_classes,n_classes] betas[n_groups];
 
-  alphas = mus * etas;
-  betas = (1-mus) * etas;
+    for (c in 1:n_groups) {
+        for (i in 1:n_classes) {
+            for (j in 1:n_classes) {
+                alphas[c,i,j] = mus[i,j] * etas[i,j] + group_mus[c,i,j] * group_etas[c,i,j];
+                betas[c,i,j] = (1-mus[i,j]) * etas[i,j] + (1-group_mus[c,i,j]) * group_etas[c,i,j];
+            }
+        }
+    }
 }
 
 model {
@@ -153,7 +164,16 @@ model {
     for (c in 1:n_groups) {
         for (i in 1:n_classes) {
             for (j in 1:n_classes) {
-                group_confusion[c,i,j] ~ beta(alphas[i,j], betas[i,j]);
+                group_mus[c,i,j] ~ beta(1,1);
+                group_etas[c,i,j] ~ pareto(1, 1.5);
+            }
+        }
+    }
+
+    for (c in 1:n_groups) {
+        for (i in 1:n_classes) {
+            for (j in 1:n_classes) {
+                group_confusion[c,i,j] ~ beta(alphas[c,i,j], betas[c,i,j]);
             }
         }
     }
@@ -191,4 +211,4 @@ if __name__ == "__main__":
     posterior = stan.build(stan_code, data = data)
     fit = posterior.sample(num_chains = args.chains, num_samples = args.samples)
     df = fit.to_frame()
-    df.to_csv('fit.csv')
+    df.to_parquet('fit.parquet')
