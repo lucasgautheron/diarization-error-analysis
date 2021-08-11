@@ -18,3 +18,8 @@
 	url = git@gin.g-node.org:/LAAC-LSCP/tsimane2017.git
 	datalad-id = 5acde0e8-1e8e-4da3-86ea-92baace24d57
 	datalad-url = git@gin.g-node.org:/LAAC-LSCP/tsimane2017.git
+[submodule "input/namibia"]
+	path = input/namibia
+	url = git@gin.g-node.org:/LAAC-LSCP/namibia.git
+	datalad-id = 5e5056b2-a2ad-4d87-b526-2adacf5348a3
+	datalad-url = git@gin.g-node.org:/LAAC-LSCP/namibia.git
