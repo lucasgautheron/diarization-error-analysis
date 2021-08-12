@@ -13,6 +13,7 @@ from os.path import basename, exists
 import multiprocessing as mp
 
 import numpy as np
+from scipy.stats import binom
 import pandas as pd
 from pyannote.core import Annotation, Segment, Timeline
 
@@ -131,11 +132,17 @@ if __name__ == "__main__":
     for i, speaker_A in enumerate(speakers):
         ax = axes.flatten()[i]
         for j, speaker_B in enumerate(speakers):
-            ax.scatter(
+            low = binom.ppf(0.025, data[f'truth_{speaker_B}'].values, data[f'vtc_{speaker_A}_{speaker_B}'].values/data[f'truth_{speaker_B}'].values)
+            high = binom.ppf(0.975, data[f'truth_{speaker_B}'].values, data[f'vtc_{speaker_A}_{speaker_B}'].values/data[f'truth_{speaker_B}'].values)
+
+            ax.errorbar(
                 data[f'truth_{speaker_B}'],
                 data[f'vtc_{speaker_A}_{speaker_B}'],
+                yerr = np.array([low, high]),
                 color = colors[j]
             )
+            ax.set_xscale('log')
+            ax.set_yscale('log')
 
     fig.savefig('output/summary.png')
 
