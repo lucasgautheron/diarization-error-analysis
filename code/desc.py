@@ -16,6 +16,8 @@ import numpy as np
 import pandas as pd
 from pyannote.core import Annotation, Segment, Timeline
 
+from matplotlib import pyplot as plt
+
 parser = argparse.ArgumentParser(description = 'model3')
 parser.add_argument('--group', default = 'child', choices = ['corpus', 'child'])
 parser.add_argument('--chains', default = 4, type = int)
@@ -91,7 +93,7 @@ def compute_counts(parameters):
                 vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = vtc[f'{speaker_A}_vocs_fp'].crop(truth[speaker_B], mode = 'loose')
                 vtc[f'{speaker_A}_vocs_unexplained'] = extrude(vtc[f'{speaker_A}_vocs_unexplained'], vtc[f'{speaker_A}_vocs_unexplained'].crop(truth[speaker_B], mode = 'loose'))
 
-        d = {}
+        d = {'child': child}
         for i, speaker_A in enumerate(speakers):
             for j, speaker_B in enumerate(speakers):
                 if i != j:
@@ -99,15 +101,14 @@ def compute_counts(parameters):
                 else:
                     z = len(vtc[f'{speaker_A}_vocs_explained'])
 
-                d[f'vtc_{i}_{j}'] = z
+                d[f'vtc_{speaker_A}_{speaker_B}'] = z
 
             if len(vtc[f'{speaker_A}_vocs_explained']) > len(truth[speaker_A]):
                 print(speaker_A, child)
 
-            d[f'truth_{i}'] = len(truth[speaker_A])
-            d[f'unexplained_{i}'] = len(vtc[f'{speaker_A}_vocs_unexplained'])
-            d['child'] = child
-
+            d[f'truth_{speaker_A}'] = len(truth[speaker_A])
+            d[f'unexplained_{speaker_B}'] = len(vtc[f'{speaker_A}_vocs_unexplained'])
+         
         data.append(d)
 
     return pd.DataFrame(data).assign(
@@ -115,11 +116,27 @@ def compute_counts(parameters):
     )
 
 if __name__ == "__main__":
-    annotators = pd.read_csv('input/annotators.csv')
+    annotators = pd.read_csv('input/annotators.csv')[0:5]
     annotators['path'] = annotators['corpus'].apply(lambda c: opj('input', c))
 
     with mp.Pool(processes = 8) as pool:
         data = pd.concat(pool.map(compute_counts, annotators.to_dict(orient = 'records')))
 
-    data.to_csv('output/summary.csv')
+    data.to_csv('output/summary.csv', index = False)
+
+    speakers = ['CHI', 'OCH', 'FEM', 'MAL']
+    colors = ['red', 'orange', 'green', 'blue']
+
+    fig, axes = plt.subplots(2, 2)
+    for i, speaker_A in enumerate(speakers):
+        ax = axes.flatten()[i]
+        for j, speaker_B in enumerate(speakers):
+            ax.scatter(
+                data[f'truth_{speaker_B}'],
+                data[f'vtc_{speaker_A}_{speaker_B}'],
+                color = colors[j]
+            )
+
+    fig.savefig('output/summary.png')
+
 
