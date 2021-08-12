@@ -130,10 +130,10 @@ if __name__ == "__main__":
     speakers = ['CHI', 'OCH', 'FEM', 'MAL']
     colors = ['red', 'orange', 'green', 'blue']
 
-    fig, axes = plt.subplots(2, 2)
+    fig, axes = plt.subplots(4, 4)
     for i, speaker_A in enumerate(speakers):
-        ax = axes.flatten()[i]
         for j, speaker_B in enumerate(speakers):
+            ax = axes.flatten()[4*i+j]
             x = data[f'truth_{speaker_B}']
             y = data[f'vtc_{speaker_A}_{speaker_B}']
 
@@ -159,11 +159,35 @@ if __name__ == "__main__":
                 s = 0.75,
                 color = colors[j]
             )
+
             ax.set_xscale('log')
             ax.set_yscale('log')
-            ax.set_xlabel(speaker_B)
-            ax.set_ylabel(speaker_A)
+            ax.set_xlim(1,1000)
+            ax.set_ylim(1,1000)
+            ax.set_xticks([])
+            ax.set_xticklabels([])
+            ax.set_yticks([])
+            ax.set_yticklabels([])
 
+            if i == 0:
+                ax.xaxis.tick_top()
+                ax.set_xticks([100])
+                ax.set_xticklabels([speakers[j]])
+
+            if i == 3:
+                ax.set_xticks(np.power(10, np.arange(1,4)))
+                ax.set_xticklabels([f'10$^{i}$' for i in [1,2,3]])
+
+            if j == 0:
+                ax.set_yticks([100])
+                ax.set_yticklabels([speakers[i]])
+            
+            if j == 3:
+                ax.yaxis.tick_right()
+                ax.set_yticks(np.power(10, np.arange(1,4)))
+                ax.set_yticklabels([f'10$^{i}$' for i in [1,2,3]])
+
+    fig.subplots_adjust(wspace = 0, hspace = 0)
     fig.savefig('output/summary.png')
 
 
