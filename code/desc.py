@@ -117,7 +117,9 @@ def compute_counts(parameters):
     )
 
 if __name__ == "__main__":
-    annotators = pd.read_csv('input/annotators.csv')[0:5]
+    annotators = pd.read_csv('input/annotators.csv')
+    annotators = annotators[~annotators['annotator'].str.startswith('eaf_2021')]
+
     annotators['path'] = annotators['corpus'].apply(lambda c: opj('input', c))
 
     with mp.Pool(processes = 8) as pool:
@@ -132,17 +134,35 @@ if __name__ == "__main__":
     for i, speaker_A in enumerate(speakers):
         ax = axes.flatten()[i]
         for j, speaker_B in enumerate(speakers):
-            low = binom.ppf(0.025, data[f'truth_{speaker_B}'].values, data[f'vtc_{speaker_A}_{speaker_B}'].values/data[f'truth_{speaker_B}'].values)
-            high = binom.ppf(0.975, data[f'truth_{speaker_B}'].values, data[f'vtc_{speaker_A}_{speaker_B}'].values/data[f'truth_{speaker_B}'].values)
+            x = data[f'truth_{speaker_B}']
+            y = data[f'vtc_{speaker_A}_{speaker_B}']
+
+            low = binom.ppf((1-0.68)/2, x, y/x)
+            high = binom.ppf(1-(1-0.68)/2, x, y/x)
+            yerr = np.array([
+                y-low, high-y
+            ])
+            yerr = np.nan_to_num(yerr)
+
+            print(yerr.shape, x.shape)
+            print(x,y,yerr)
 
             ax.errorbar(
-                data[f'truth_{speaker_B}'],
-                data[f'vtc_{speaker_A}_{speaker_B}'],
-                yerr = np.array([low, high]),
+                x, y,
+                yerr = yerr,
+                color = colors[j],
+                ls='none',
+                elinewidth=0.5
+            )
+            ax.scatter(
+                x, y,
+                s = 0.75,
                 color = colors[j]
             )
             ax.set_xscale('log')
             ax.set_yscale('log')
+            ax.set_xlabel(speaker_B)
+            ax.set_ylabel(speaker_A)
 
     fig.savefig('output/summary.png')
 
