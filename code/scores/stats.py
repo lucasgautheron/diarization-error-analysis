@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-# find ../../data/solomon-ana/output/clips -maxdepth 1 -type f -exec sbatch -c 2 --mem 1G -o vtc ./apply.sh {} --device=cpu \;
+# find ../../data/solomon-ana/output/clips -maxdepth 1 -type f -name "tsimane*" -exec sbatch -c 2 --mem 1G -o vtc ./apply.sh {} --device=cpu \;
+
+# while read in; do sbatch -c 2 --mem 1G -o vtc ./apply.sh "../../data/solomon-ana/output/clips/$in" --device=cpu; done < ../../data/solomon-ana/output/clips/vtc.txt
 
 from ChildProject.projects import ChildProject
 from ChildProject.annotations import AnnotationManager
@@ -12,9 +14,11 @@ import multiprocessing as mp
 import numpy as np
 from os.path import join as opj
 from os.path import basename, exists, splitext
+from matplotlib import pyplot as plt
 import pandas as pd
 from pyannote.core import Annotation, Segment, Timeline
 import soundfile
+from scipy.stats import poisson
 
 def extrude(self, removed, mode: str = 'intersection'):
     if isinstance(removed, Segment):
@@ -38,10 +42,13 @@ def process_clip(am, annotator, clip):
 
     data = None
     for i, speaker in enumerate(vtc_speakers):
-        signal, sr = librosa.load(
-            clip_path + f'/{speaker}.wav',
-            sr = None
-        )
+        path = clip_path + f'/{speaker}.wav'
+
+        if not exists(path):
+            return None
+
+        signal, sr = librosa.load(path, sr = None)
+
         time_scale = len(signal)/(range_offset-range_onset+4000)
         signal = signal[int(2000*time_scale):-int(2000*time_scale)]
 
@@ -73,6 +80,10 @@ def process_clip(am, annotator, clip):
 
         for speaker_B in speakers:
             vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = vtc[f'{speaker_A}_vocs_fp'].crop(truth[speaker_B], mode = 'loose')
+            
+            for speaker_C in speakers:
+                if speaker_C != speaker_B and speaker_C != speaker_A:
+                    vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = extrude(vtc[f'{speaker_A}_vocs_fp_{speaker_B}'], truth[speaker_C])
 
         s = []
         for explained in vtc[f'{speaker_A}_vocs_explained']:
@@ -81,6 +92,7 @@ def process_clip(am, annotator, clip):
             offset -= range_onset
             
             s.append(np.mean(data[i, int(onset*time_scale):int(offset*time_scale)]))
+
         stats[f'{speaker_A}_vocs_explained'] = s
 
         for j, speaker_B in enumerate(speakers):
@@ -117,7 +129,7 @@ def generate_stats(parameters):
         axis = 1
     )
 
-    with mp.Pool(processes = 4) as pool:
+    with mp.Pool(processes = 32) as pool:
         stats = [
             process_clip(am, annotator, clip)
             for clip in intersection.groupby([
@@ -128,7 +140,7 @@ def generate_stats(parameters):
     return stats
     
 if __name__ == '__main__':
-    annotators = pd.read_csv('input/annotators.csv')[0:5]
+    annotators = pd.read_csv('input/annotators.csv')[:-3]
     annotators['path'] = annotators['corpus'].apply(lambda c: opj('input', c))
     stats = [generate_stats(annotator) for annotator in annotators.to_dict(orient = 'records')]
     stats = sum(stats, [])
@@ -151,3 +163,76 @@ if __name__ == '__main__':
             np.quantile(combined[k], 0.9),
             len(combined[k])
         )
+
+    speakers = ['CHI', 'OCH', 'FEM', 'MAL']
+    colors = ['red', 'orange', 'green', 'blue']
+
+    fig, axes = plt.subplots(4, 4)
+    for i, speaker_A in enumerate(speakers):
+        for j, speaker_B in enumerate(speakers):
+            ax = axes.flatten()[4*i+j]
+
+            if i == j:
+                data = combined[f'{speaker_B}_vocs_explained']
+            else:
+                data = combined[f'{speaker_B}_vocs_fp_{speaker_A}_false']
+
+            hist, edges = np.histogram(data, bins = 20, range = (0,1))
+            bins = (edges[:-1] + edges[1:]) / 2
+            width = bins[1]-bins[0]
+
+            low = poisson.ppf((1-0.68)/2, hist)
+            high = poisson.ppf(1-(1-0.68)/2, hist)
+            yerr = np.array([
+                hist-low, high-hist
+            ])
+            yerr = np.nan_to_num(yerr)
+
+            s = np.sum(hist)
+            hist = hist/s
+            yerr = yerr/s
+
+            ax.errorbar(
+                bins, hist,
+                yerr = yerr,
+                color = colors[j],
+                ls='none',
+                elinewidth=0.5
+            )
+            ax.bar(
+                bins, hist,
+                color = colors[j],
+                width = width
+            )
+            ax.axvline(np.nanmean(data), linestyle = '--', linewidth = 0.5, color = '#333', alpha = 1)
+
+            ax.set_xlim(0,1)
+            ax.set_ylim(0,0.5)
+
+            ax.set_xticks([])
+            ax.set_xticklabels([])
+            ax.set_yticks([])
+            ax.set_yticklabels([])
+
+            if i == 0:
+                ax.xaxis.tick_top()
+                ax.set_xticks([0.5])
+                ax.set_xticklabels([speakers[j]])
+
+            if i == 3:
+                ax.set_xticks(np.linspace(0,1,4,endpoint=False))
+                ax.set_xticklabels(np.linspace(0,1,4,endpoint=False))
+
+            if j == 0:
+                ax.set_yticks([0.25])
+                ax.set_yticklabels([speakers[i]])
+            
+            if j == 3:
+                ax.yaxis.tick_right()
+                ax.set_yticks(np.linspace(0,0.5,4,endpoint=False))
+                ax.set_yticklabels(['' for i in np.linspace(0,0.5,4,endpoint=False)])
+
+    fig.subplots_adjust(wspace = 0, hspace = 0)
+    fig.savefig('output/scores.png')
+
+

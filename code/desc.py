@@ -84,15 +84,20 @@ def compute_counts(parameters):
             for speaker in speakers
         }
 
-        for speaker_A in speakers:
+        for i, speaker_A in enumerate(speakers):
             vtc[f'{speaker_A}_vocs_explained'] = vtc[speaker_A].crop(truth[speaker_A], mode = 'loose')
             vtc[f'{speaker_A}_vocs_fp'] = extrude(vtc[speaker_A], vtc[f'{speaker_A}_vocs_explained'])
             vtc[f'{speaker_A}_vocs_fn'] = extrude(truth[speaker_A], truth[speaker_A].crop(vtc[speaker_A], mode = 'loose'))
             vtc[f'{speaker_A}_vocs_unexplained'] = extrude(vtc[speaker_A], vtc[f'{speaker_A}_vocs_explained'])
-
+            
             for speaker_B in speakers:
                 vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = vtc[f'{speaker_A}_vocs_fp'].crop(truth[speaker_B], mode = 'loose')
                 vtc[f'{speaker_A}_vocs_unexplained'] = extrude(vtc[f'{speaker_A}_vocs_unexplained'], vtc[f'{speaker_A}_vocs_unexplained'].crop(truth[speaker_B], mode = 'loose'))
+                
+                for speaker_C in speakers:
+                    if speaker_C != speaker_B and speaker_C != speaker_A:
+                        vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = extrude(vtc[f'{speaker_A}_vocs_fp_{speaker_B}'], truth[speaker_C])
+                
 
         d = {'child': child}
         for i, speaker_A in enumerate(speakers):
@@ -134,8 +139,8 @@ if __name__ == "__main__":
     for i, speaker_A in enumerate(speakers):
         for j, speaker_B in enumerate(speakers):
             ax = axes.flatten()[4*i+j]
-            x = data[f'truth_{speaker_B}']
-            y = data[f'vtc_{speaker_A}_{speaker_B}']
+            x = data[f'truth_{speaker_A}']
+            y = data[f'vtc_{speaker_B}_{speaker_A}']
 
             low = binom.ppf((1-0.68)/2, x, y/x)
             high = binom.ppf(1-(1-0.68)/2, x, y/x)
