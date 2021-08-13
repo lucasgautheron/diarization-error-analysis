@@ -135,7 +135,7 @@ if __name__ == "__main__":
     speakers = ['CHI', 'OCH', 'FEM', 'MAL']
     colors = ['red', 'orange', 'green', 'blue']
 
-    fig, axes = plt.subplots(4, 4)
+    fig, axes = plt.subplots(4, 4, figsize = (6,6))
     for i, speaker_A in enumerate(speakers):
         for j, speaker_B in enumerate(speakers):
             ax = axes.flatten()[4*i+j]
@@ -152,11 +152,11 @@ if __name__ == "__main__":
             print(yerr.shape, x.shape)
             print(x,y,yerr)
 
-            slopes_x = np.logspace(1,1000,num=3)
+            slopes_x = np.logspace(0,3,num=3)
 
-            ax.plot(slopes_x, slopes_x, color = 'black', lw = 0.5)
-            ax.plot(slopes_x, 0.1*slopes_x, color = '#ccc', lw = 0.5, linestyle = '--')
-            ax.plot(slopes_x, 0.01*slopes_x, color = '#ccc', lw = 0.5, linestyle = '-.')
+            ax.plot(slopes_x, slopes_x, color = '#ddd', lw = 0.5)
+            ax.plot(slopes_x, 0.1*slopes_x, color = '#ddd', lw = 0.5, linestyle = '--')
+            ax.plot(slopes_x, 0.01*slopes_x, color = '#ddd', lw = 0.5, linestyle = '-.')
 
             ax.errorbar(
                 x, y,
@@ -182,7 +182,7 @@ if __name__ == "__main__":
 
             if i == 0:
                 ax.xaxis.tick_top()
-                ax.set_xticks([100])
+                ax.set_xticks([10**1.5])
                 ax.set_xticklabels([speakers[j]])
 
             if i == 3:
@@ -190,7 +190,7 @@ if __name__ == "__main__":
                 ax.set_xticklabels([f'10$^{i}$' for i in [1,2,3]])
 
             if j == 0:
-                ax.set_yticks([100])
+                ax.set_yticks([10**1.5])
                 ax.set_yticklabels([speakers[i]])
             
             if j == 3:
