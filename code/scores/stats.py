@@ -14,11 +14,24 @@ import multiprocessing as mp
 import numpy as np
 from os.path import join as opj
 from os.path import basename, exists, splitext
+
+import matplotlib
+matplotlib.use("pgf")
+matplotlib.rcParams.update({
+    "pgf.texsystem": "pdflatex",
+    'font.family': 'serif',
+    'text.usetex': True,
+    'pgf.rcfonts': False,
+})
 from matplotlib import pyplot as plt
+
 import pandas as pd
 from pyannote.core import Annotation, Segment, Timeline
 import soundfile
 from scipy.stats import poisson
+
+def set_size(width, ratio):
+    return width/72.27, ratio*width/72.27
 
 def extrude(self, removed, mode: str = 'intersection'):
     if isinstance(removed, Segment):
@@ -239,6 +252,9 @@ if __name__ == '__main__':
 
     fig.suptitle("VTC scores for true and false positive vocalizations")
     fig.subplots_adjust(wspace = 0, hspace = 0)
-    fig.savefig('output/scores.png')
+
+    fig.set_size_inches(set_size(450, 1))
+    fig.savefig('output/scores.pdf')
+    fig.savefig('output/scores.pgf')
 
 
