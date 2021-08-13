@@ -89,7 +89,7 @@ def compute_counts(parameters):
             vtc[f'{speaker_A}_vocs_fp'] = extrude(vtc[speaker_A], vtc[f'{speaker_A}_vocs_explained'])
             vtc[f'{speaker_A}_vocs_fn'] = extrude(truth[speaker_A], truth[speaker_A].crop(vtc[speaker_A], mode = 'loose'))
             vtc[f'{speaker_A}_vocs_unexplained'] = extrude(vtc[speaker_A], vtc[f'{speaker_A}_vocs_explained'])
-            
+
             for speaker_B in speakers:
                 vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = vtc[f'{speaker_A}_vocs_fp'].crop(truth[speaker_B], mode = 'loose')
                 vtc[f'{speaker_A}_vocs_unexplained'] = extrude(vtc[f'{speaker_A}_vocs_unexplained'], vtc[f'{speaker_A}_vocs_unexplained'].crop(truth[speaker_B], mode = 'loose'))
@@ -151,6 +151,12 @@ if __name__ == "__main__":
 
             print(yerr.shape, x.shape)
             print(x,y,yerr)
+
+            slopes_x = np.logspace(1,1000,num=3)
+
+            ax.plot(slopes_x, slopes_x, color = 'black', lw = 0.5)
+            ax.plot(slopes_x, 0.1*slopes_x, color = '#ccc', lw = 0.5, linestyle = '--')
+            ax.plot(slopes_x, 0.01*slopes_x, color = '#ccc', lw = 0.5, linestyle = '-.')
 
             ax.errorbar(
                 x, y,
