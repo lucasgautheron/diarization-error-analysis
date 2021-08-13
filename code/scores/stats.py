@@ -129,7 +129,7 @@ def generate_stats(parameters):
         axis = 1
     )
 
-    with mp.Pool(processes = 32) as pool:
+    with mp.Pool(processes = 48) as pool:
         stats = [
             process_clip(am, annotator, clip)
             for clip in intersection.groupby([
@@ -232,6 +232,12 @@ if __name__ == '__main__':
                 ax.set_yticks(np.linspace(0,0.5,4,endpoint=False))
                 ax.set_yticklabels(['' for i in np.linspace(0,0.5,4,endpoint=False)])
 
+
+    fig.add_subplot(111, frameon=False)
+    plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+    plt.xlabel("vocalizations average scores ($\hat{y}$)")
+
+    fig.suptitle("VTC scores for true and false positive vocalizations")
     fig.subplots_adjust(wspace = 0, hspace = 0)
     fig.savefig('output/scores.png')
 
