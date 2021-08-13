@@ -246,9 +246,14 @@ if __name__ == '__main__':
                 ax.set_yticklabels(['' for i in np.linspace(0,0.5,4,endpoint=False)])
 
 
-    fig.add_subplot(111, frameon=False)
+    ax = fig.add_subplot(111, frameon=False)
+    ax.set_xticks([])
+    ax.set_xticklabels([])
+    ax.set_yticks([])
+    ax.set_yticklabels([])
+
     plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
-    plt.xlabel("vocalizations average scores ($\hat{y}$)")
+    plt.xlabel("vocalizations average scores ($\hat{y}$)", labelpad=20)
 
     fig.suptitle("VTC scores for true and false positive vocalizations")
     fig.subplots_adjust(wspace = 0, hspace = 0)
@@ -256,5 +261,6 @@ if __name__ == '__main__':
     fig.set_size_inches(set_size(450, 1))
     fig.savefig('output/scores.pdf')
     fig.savefig('output/scores.pgf')
+
 
 

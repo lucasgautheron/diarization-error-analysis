@@ -17,6 +17,14 @@ from scipy.stats import binom
 import pandas as pd
 from pyannote.core import Annotation, Segment, Timeline
 
+import matplotlib
+matplotlib.use("pgf")
+matplotlib.rcParams.update({
+    "pgf.texsystem": "pdflatex",
+    'font.family': 'serif',
+    'text.usetex': True,
+    'pgf.rcfonts': False,
+})
 from matplotlib import pyplot as plt
 
 parser = argparse.ArgumentParser(description = 'model3')
@@ -24,6 +32,9 @@ parser.add_argument('--group', default = 'child', choices = ['corpus', 'child'])
 parser.add_argument('--chains', default = 4, type = int)
 parser.add_argument('--samples', default = 2000, type = int)
 args = parser.parse_args()
+
+def set_size(width, ratio):
+    return width/72.27, ratio*width/72.27
 
 def extrude(self, removed, mode: str = 'intersection'):
     if isinstance(removed, Segment):
@@ -139,18 +150,22 @@ if __name__ == "__main__":
     for i, speaker_A in enumerate(speakers):
         for j, speaker_B in enumerate(speakers):
             ax = axes.flatten()[4*i+j]
-            x = data[f'truth_{speaker_A}']
-            y = data[f'vtc_{speaker_B}_{speaker_A}']
+
+            x = data[f'truth_{speaker_A}'].values
+            y = data[f'vtc_{speaker_B}_{speaker_A}'].values
+
+            mask = (x > 0) & (y > 0)
+            x = x[mask]
+            y = y[mask]
 
             low = binom.ppf((1-0.68)/2, x, y/x)
             high = binom.ppf(1-(1-0.68)/2, x, y/x)
-            yerr = np.array([
-                y-low, high-y
-            ])
-            yerr = np.nan_to_num(yerr)
 
-            print(yerr.shape, x.shape)
-            print(x,y,yerr)
+            mask = (~np.isnan(low)&(~np.isnan(high)))
+
+            yerr = np.array([
+                y[mask]-low[mask], high[mask]-y[mask]
+            ])
 
             slopes_x = np.logspace(0,3,num=3)
 
@@ -159,7 +174,7 @@ if __name__ == "__main__":
             ax.plot(slopes_x, 0.01*slopes_x, color = '#ddd', lw = 0.5, linestyle = '-.')
 
             ax.errorbar(
-                x, y,
+                x[mask], y[mask],
                 yerr = yerr,
                 color = colors[j],
                 ls='none',
@@ -199,6 +214,11 @@ if __name__ == "__main__":
                 ax.set_yticklabels([f'10$^{i}$' for i in [1,2,3]])
 
     fig.subplots_adjust(wspace = 0, hspace = 0)
-    fig.savefig('output/summary.png')
+
+    fig.set_size_inches(set_size(450, 1))
+    fig.savefig('output/summary.pdf')
+    fig.savefig('output/summary.pgf')
+
+
 
 
