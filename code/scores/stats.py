@@ -212,10 +212,11 @@ if __name__ == '__main__':
                 ls='none',
                 elinewidth=0.5
             )
-            ax.bar(
+            ax.step(
                 bins, hist,
                 color = colors[j],
-                width = width
+                linewidth = 1,
+                where = 'mid'
             )
             ax.axvline(np.nanmean(data), linestyle = '--', linewidth = 0.5, color = '#333', alpha = 1)
 
@@ -261,6 +262,7 @@ if __name__ == '__main__':
     fig.set_size_inches(set_size(450, 1))
     fig.savefig('output/scores.pdf')
     fig.savefig('output/scores.pgf')
+
 
 
 
