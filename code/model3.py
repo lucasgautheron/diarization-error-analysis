@@ -14,6 +14,7 @@ import multiprocessing as mp
 
 import numpy as np
 import pandas as pd
+import pickle
 from pyannote.core import Annotation, Segment, Timeline
 
 import stan
@@ -21,7 +22,8 @@ import stan
 parser = argparse.ArgumentParser(description = 'model3')
 parser.add_argument('--group', default = 'child', choices = ['corpus', 'child'])
 parser.add_argument('--chains', default = 4, type = int)
-parser.add_argument('--samples', default = 5000, type = int)
+parser.add_argument('--samples', default = 2000, type = int)
+parser.add_argument('--validation', default = 0, type = float)
 args = parser.parse_args()
 
 def extrude(self, removed, mode: str = 'intersection'):
@@ -91,13 +93,21 @@ def compute_counts(parameters):
             for speaker_B in speakers:
                 vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = vtc[f'{speaker_A}_vocs_fp'].crop(truth[speaker_B], mode = 'loose')
 
+                for speaker_C in speakers:
+                    if speaker_C != speaker_B and speaker_C != speaker_A:
+                        vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = extrude(
+                            vtc[f'{speaker_A}_vocs_fp_{speaker_B}'],
+                            vtc[f'{speaker_A}_vocs_fp_{speaker_B}'].crop(truth[speaker_C], mode = 'loose')
+                        )
+
+
         d = {}
         for i, speaker_A in enumerate(speakers):
             for j, speaker_B in enumerate(speakers):
                 if i != j:
                     z = len(vtc[f'{speaker_A}_vocs_fp_{speaker_B}'])
                 else:
-                    z = len(truth[speaker_A]) - len(vtc[f'{speaker_A}_vocs_fn'])
+                    z = min(len(vtc[f'{speaker_A}_vocs_explained']), len(truth[speaker_A]))
 
                 d[f'vtc_{i}_{j}'] = z
 
@@ -118,6 +128,7 @@ data {
   int group[n_clips];
   int vtc[n_clips,n_classes,n_classes];
   int truth[n_clips,n_classes];
+  int n_validation;
 }
 
 parameters {
@@ -135,7 +146,7 @@ transformed parameters {
 }
 
 model {
-    for (k in 1:n_clips) {
+    for (k in n_validation:n_clips) {
         for (i in 1:n_classes) {
             for (j in 1:n_classes) {
                 vtc[k,i,j] ~ binomial(truth[k,j], group_confusion[group[k],j,i]);
@@ -158,6 +169,28 @@ model {
         }
     }
 }
+
+generated quantities {
+    int pred[n_clips,n_classes];
+    matrix[n_classes,n_classes] probs[n_groups];
+
+    for (c in 1:n_groups) {
+        for (i in 1:n_classes) {
+            for (j in 1:n_classes) {
+                probs[c,i,j] = beta_rng(alphas[i,j], betas[i,j]);
+            }
+        }
+    }
+
+    for (k in 1:n_clips) {
+        for (i in 1:n_classes) {
+            pred[k,i] = 0;
+            for (j in 1:n_classes) {
+                pred[k,i] += binomial_rng(truth[k,j], probs[group[k],i,j]); 
+            }
+        }
+    }
+}
 """
 
 if __name__ == "__main__":
@@ -167,7 +200,7 @@ if __name__ == "__main__":
     with mp.Pool(processes = 8) as pool:
         data = pd.concat(pool.map(compute_counts, annotators.to_dict(orient = 'records')))
 
-    print(data)
+    data = data.sample(frac = 1)
 
     vtc = np.moveaxis([[data[f'vtc_{j}_{i}'].values for i in range(4)] for j in range(4)], -1, 0)
     truth = np.transpose([data[f'truth_{i}'].values for i in range(4)])
@@ -178,6 +211,7 @@ if __name__ == "__main__":
         'n_clips': truth.shape[0],
         'n_classes': truth.shape[1],
         'n_groups': data[args.group].nunique(),
+        'n_validation': int(truth.shape[0]*args.validation),
         'group': 1+data[args.group].astype('category').cat.codes.values,
         'truth': truth.astype(int),
         'vtc': vtc.astype(int)
@@ -188,7 +222,11 @@ if __name__ == "__main__":
     print("true vocs: {}".format(np.sum(data['truth'])))
     print("vtc vocs: {}".format(np.sum(data['vtc'])))
 
+    with open('data_model3.pickle', 'wb') as fp:
+        pickle.dump(data, fp, pickle.HIGHEST_PROTOCOL)
+
     posterior = stan.build(stan_code, data = data)
     fit = posterior.sample(num_chains = args.chains, num_samples = args.samples)
     df = fit.to_frame()
-    df.to_csv('fit.csv')
+    df.to_parquet('fit_model3.parquet')
+

@@ -3,6 +3,7 @@
 import pandas as pd
 import numpy as np
 
+import argparse
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use("pgf")
@@ -15,37 +16,17 @@ matplotlib.rcParams.update({
 })
 
 def set_size(width, fraction=1, ratio = None):
-    """ Set aesthetic figure dimensions to avoid scaling in latex.
-
-    Parameters
-    ----------
-    width: float
-            Width in pts
-    fraction: float
-            Fraction of the width which you wish the figure to occupy
-
-    Returns
-    -------
-    fig_dim: tuple
-            Dimensions of figure in inches
-    """
-    # Width of figure
     fig_width_pt = width * fraction
-
-    # Convert from pt to inches
     inches_per_pt = 1 / 72.27
-
-    # Golden ratio to set aesthetic figure height
     if ratio is None:
         ratio = (5 ** 0.5 - 1) / 2
-
-    # Figure width in inches
     fig_width_in = fig_width_pt * inches_per_pt
-    # Figure height in inches
     fig_height_in = fig_width_in * ratio
-
     return fig_width_in, fig_height_in
 
+parser = argparse.ArgumentParser(description = 'plot3')
+parser.add_argument('--group', type = int, default = None)
+args = parser.parse_args()
 
 fit = pd.read_parquet('fit.parquet')
 
@@ -54,13 +35,18 @@ axes = [fig.add_subplot(4,4,i+1) for i in range(4*4)]
 
 speakers = ['CHI', 'OCH', 'FEM', 'MAL']
 
+n_groups = 5
+
 for i in range(4*4):
     ax = axes[i]
     row = i//4+1
     col = i%4+1
     label = f'{row}.{col}'
 
-    data = np.hstack([fit[f'alphas.{k}.{label}']/(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,59)])
+    if args.group is None:
+        data = np.hstack([fit[f'alphas.{k}.{label}']/(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,n_groups+1)])
+    else:
+        data = fit[f'alphas.{args.group}.{label}']/(fit[f'alphas.{args.group}.{label}']+fit[f'betas.{args.group}.{label}']).values
     #data = np.hstack([(fit[f'group_mus.{k}.{label}']).values for k in range(1,59)])
     #data = fit[f'mus.{label}'].values    
   
@@ -93,5 +79,11 @@ for i in range(4*4):
 
 fig.suptitle("$\mu_{eff}$ distribution")
 fig.subplots_adjust(wspace = 0, hspace = 0)
-plt.savefig('mu_eff.pdf')
+
+if args.group:
+    plt.savefig(f'mu_eff_{args.group}.pdf')
+else:
+    plt.savefig('mu_eff.pdf')
+
 plt.show()
+

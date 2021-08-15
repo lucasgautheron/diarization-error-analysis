@@ -56,14 +56,16 @@ axes = [fig.add_subplot(4,4,i+1) for i in range(4*4)]
 
 speakers = ['CHI', 'OCH', 'FEM', 'MAL']
 
+n_groups = 5
+
 for i in range(4*4):
     ax = axes[i]
     row = i//4+1
     col = i%4+1
     label = f'{row}.{col}'
 
-    mus = np.hstack([fit[f'alphas.{k}.{label}']/(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,59)])
-    etas = np.hstack([(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,59)])
+    mus = np.hstack([fit[f'alphas.{k}.{label}']/(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,n_groups+1)])
+    etas = np.hstack([(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,n_groups+1)])
     etas = np.log10(etas)
 
     ax.set_xticks([])
@@ -99,3 +101,4 @@ for i in range(4*4):
 fig.subplots_adjust(wspace = 0, hspace = 0)
 plt.savefig('density.pdf')
 plt.show()
+

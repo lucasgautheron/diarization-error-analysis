@@ -107,8 +107,10 @@ def compute_counts(parameters):
                 
                 for speaker_C in speakers:
                     if speaker_C != speaker_B and speaker_C != speaker_A:
-                        vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = extrude(vtc[f'{speaker_A}_vocs_fp_{speaker_B}'], truth[speaker_C])
-                
+                        vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = extrude(
+                            vtc[f'{speaker_A}_vocs_fp_{speaker_B}'],
+                            vtc[f'{speaker_A}_vocs_fp_{speaker_B}'].crop(truth[speaker_C], mode = 'loose')
+                        )                
 
         d = {'child': child}
         for i, speaker_A in enumerate(speakers):
@@ -218,6 +220,7 @@ if __name__ == "__main__":
     fig.set_size_inches(set_size(450, 1))
     fig.savefig('output/summary.pdf')
     fig.savefig('output/summary.pgf')
+
 
 
 

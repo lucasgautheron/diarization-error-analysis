@@ -18,7 +18,7 @@ from pyannote.core import Annotation, Segment, Timeline
 
 import stan
 
-parser = argparse.ArgumentParser(description = 'model3')
+parser = argparse.ArgumentParser(description = 'model4')
 parser.add_argument('--group', default = 'child', choices = ['corpus', 'child'])
 parser.add_argument('--chains', default = 4, type = int)
 parser.add_argument('--samples', default = 2000, type = int)
@@ -91,18 +91,30 @@ def compute_counts(parameters):
             for speaker_B in speakers:
                 vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = vtc[f'{speaker_A}_vocs_fp'].crop(truth[speaker_B], mode = 'loose')
 
-        d = {}
+                for speaker_C in speakers:
+                    if speaker_C != speaker_B and speaker_C != speaker_A:
+                        vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = extrude(
+                            vtc[f'{speaker_A}_vocs_fp_{speaker_B}'],
+                            vtc[f'{speaker_A}_vocs_fp_{speaker_B}'].crop(truth[speaker_C], mode = 'loose')
+                        )
+
+
+        d = {
+            'child': child,
+            'duration': (intersection['range_offset']-intersection['range_onset']).sum()/(2*1000)
+        }
+
         for i, speaker_A in enumerate(speakers):
             for j, speaker_B in enumerate(speakers):
                 if i != j:
                     z = len(vtc[f'{speaker_A}_vocs_fp_{speaker_B}'])
                 else:
-                    z = len(vtc[f'{speaker_A}_vocs_explained'])
+                    z = min(len(vtc[f'{speaker_A}_vocs_explained']), len(truth[speaker_A]))
 
                 d[f'vtc_{i}_{j}'] = z
 
             d[f'truth_{i}'] = len(truth[speaker_A])
-            d['child'] = child
+        
 
         data.append(d)
 
@@ -111,12 +123,6 @@ def compute_counts(parameters):
     )
 
 stan_code = """
-functions {
-  real logp(int k, real p) {
-    return log(-1/log(1-p)) + k*log(p) - log(k);
-  }
-}
-
 data {
   int<lower=1> n_clips;   // number of clips
   int<lower=1> n_groups; // number of groups
@@ -135,52 +141,39 @@ parameters {
 
   matrix<lower=0,upper=1>[n_classes,n_classes] group_confusion[n_groups];
 
-  vector<lower=0>[n_classes] lambdas;
 }
 
 transformed parameters {
-  matrix<lower=0>[n_classes,n_classes] alphas[n_groups];
-  matrix<lower=0>[n_classes,n_classes] betas[n_groups];
-  matrix[n_clips,n_classes] loglik;
+  matrix<lower=0>[n_classes,n_classes] group_alphas[n_groups];
+  matrix<lower=0>[n_classes,n_classes] group_betas[n_groups];
 
-    for (c in 1:n_groups) {
-        for (i in 1:n_classes) {
-            for (j in 1:n_classes) {
-                alphas[c,i,j] = mus[i,j] * etas[i,j] + group_mus[c,i,j] * group_etas[c,i,j];
-                betas[c,i,j] = (1-mus[i,j]) * etas[i,j] + (1-group_mus[c,i,j]) * group_etas[c,i,j];
+  matrix<lower=0>[n_classes,n_classes] alphas;
+  matrix<lower=0>[n_classes,n_classes] betas;
+
+
+    for (i in 1:n_classes) {
+        for (j in 1:n_classes) {
+            alphas[i,j] = mus[i,j]*etas[i,j];
+            betas[i,j] = (1-mus[i,j])*etas[i,j];
+
+            for (c in 1:n_groups) {
+                group_alphas[c,i,j] = group_mus[c,i,j] * group_etas[c,i,j];
+                group_betas[c,i,j] = (1-group_mus[c,i,j]) * group_etas[c,i,j];
             }
         }
     }
 
-    for (k in 1:n_clips) {
-        for (i in 1:n_classes) {
-            vector[truth[k,i]+1] clp;
-            clp = rep_vector(0, truth[k,i]+1);
-            for (n in 0:truth[k,i]) {
-                if (vtc[k,i,i] >= n) {
-                    clp[n+1] = binomial_lpmf(n | truth[k,i], group_confusion[group[k],i,i]);
-                    if (n > 0) {
-                        clp[n+1] += neg_binomial_2_lpmf(vtc[k,i,i]-n | n*lambdas[i], n);
-                    }
-                }
-            }
-            loglik[k,i] = log_sum_exp(clp);
-        }
-    }
+
 }
 
 model {
     for (k in 1:n_clips) {
         for (i in 1:n_classes) {
             for (j in 1:n_classes) {
-                if (i != j) {
-                    vtc[k,i,j] ~ binomial(truth[k,j], group_confusion[group[k],j,i]);
-                }
+                vtc[k,i,j] ~ binomial(truth[k,j], group_confusion[group[k],j,i]);
             }
         }
     }
-
-    target += sum(loglik);
 
     for (i in 1:n_classes) {
         for (j in 1:n_classes) {
@@ -192,7 +185,7 @@ model {
     for (c in 1:n_groups) {
         for (i in 1:n_classes) {
             for (j in 1:n_classes) {
-                group_mus[c,i,j] ~ beta(1,1);
+                group_mus[c,i,j] ~ beta(alphas[i,j], betas[i,j]);
                 group_etas[c,i,j] ~ pareto(1, 1.5);
             }
         }
@@ -201,12 +194,32 @@ model {
     for (c in 1:n_groups) {
         for (i in 1:n_classes) {
             for (j in 1:n_classes) {
-                group_confusion[c,i,j] ~ beta(alphas[c,i,j], betas[c,i,j]);
+                group_confusion[c,i,j] ~ beta(group_alphas[c,i,j], group_betas[c,i,j]);
+            }
+        }
+    }
+}
+
+generated quantities {
+    int pred[n_clips,n_classes];
+    matrix[n_classes,n_classes] probs[n_groups];
+
+    for (c in 1:n_groups) {
+        for (i in 1:n_classes) {
+            for (j in 1:n_classes) {
+                probs[c,i,j] = beta_rng(alphas[i,j], betas[i,j]);
             }
         }
     }
 
-    lambdas ~ exponential(0.1);
+    for (k in 1:n_clips) {
+        for (i in 1:n_classes) {
+            pred[k,i] = 0;
+            for (j in 1:n_classes) {
+                pred[k,i] += binomial_rng(truth[k,j], probs[group[k],i,j]); 
+            }
+        }
+    }
 }
 """
 
@@ -230,7 +243,8 @@ if __name__ == "__main__":
         'n_groups': data[args.group].nunique(),
         'group': 1+data[args.group].astype('category').cat.codes.values,
         'truth': truth.astype(int),
-        'vtc': vtc.astype(int)
+        'vtc': vtc.astype(int),
+        'durations': data['duration'].values
     }
 
     print(f"clips: {data['n_clips']}")
@@ -240,6 +254,6 @@ if __name__ == "__main__":
 
     posterior = stan.build(stan_code, data = data)
     fit = posterior.sample(num_chains = args.chains, num_samples = args.samples)
-    df = fit.to_frame() 
-    df.to_parquet('fit.parquet')
+    df = fit.to_frame()
+    df.to_parquet('fit_model5.parquet')
 

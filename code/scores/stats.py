@@ -26,6 +26,7 @@ matplotlib.rcParams.update({
 from matplotlib import pyplot as plt
 
 import pandas as pd
+import pickle
 from pyannote.core import Annotation, Segment, Timeline
 import soundfile
 from scipy.stats import poisson
@@ -45,6 +46,18 @@ def extrude(self, removed, mode: str = 'intersection'):
         mode = "loose"
     
     return self.crop(truncating_support, mode=mode)
+
+def mean_scores(spkr, vocs, data, time_scale, range_onset, range_offset):
+    s = []
+    for voc in vocs:
+        onset, offset = voc
+        onset -= range_onset
+        offset -= range_onset
+        
+        s.append(
+            np.mean(data[spkr, int(onset*time_scale):int(offset*time_scale)])
+        )
+    return s
 
 def process_clip(am, annotator, clip):
     index, ann = clip
@@ -96,32 +109,28 @@ def process_clip(am, annotator, clip):
             
             for speaker_C in speakers:
                 if speaker_C != speaker_B and speaker_C != speaker_A:
-                    vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = extrude(vtc[f'{speaker_A}_vocs_fp_{speaker_B}'], truth[speaker_C])
+                    vtc[f'{speaker_A}_vocs_fp_{speaker_B}'] = extrude(
+                        vtc[f'{speaker_A}_vocs_fp_{speaker_B}'],
+                        vtc[f'{speaker_A}_vocs_fp_{speaker_B}'].crop(truth[speaker_C], mode = 'loose')
+                    )
 
-        s = []
-        for explained in vtc[f'{speaker_A}_vocs_explained']:
-            onset, offset = explained
-            onset -= range_onset
-            offset -= range_onset
-            
-            s.append(np.mean(data[i, int(onset*time_scale):int(offset*time_scale)]))
-
-        stats[f'{speaker_A}_vocs_explained'] = s
+        stats[f'{speaker_A}_scores'] = mean_scores(
+            i, vtc[speaker_A], data, time_scale, range_onset, range_offset
+        )
+        stats[f'{speaker_A}_vocs_explained'] = mean_scores(
+            i, vtc[f'{speaker_A}_vocs_explained'], data, time_scale, range_onset, range_offset
+        )
+        stats[f'{speaker_A}_truth'] = mean_scores(
+            i, truth[speaker_A], data, time_scale, range_onset, range_offset
+        )
 
         for j, speaker_B in enumerate(speakers):
-            sA = []
-            sB = []
-
-            for fp in vtc[f'{speaker_A}_vocs_fp_{speaker_B}']:  
-                onset, offset = fp
-                onset -= range_onset
-                offset -= range_onset
-
-                sA.append(np.mean(data[i, int(onset*time_scale):int(offset*time_scale)]))
-                sB.append(np.mean(data[j, int(onset*time_scale):int(offset*time_scale)]))
-
-            stats[f'{speaker_A}_vocs_fp_{speaker_B}_false'] = sA
-            stats[f'{speaker_A}_vocs_fp_{speaker_B}_true'] = sB
+            stats[f'{speaker_A}_vocs_fp_{speaker_B}_false'] = mean_scores(
+                i, vtc[f'{speaker_A}_vocs_fp_{speaker_B}'], data, time_scale, range_onset, range_offset
+            )
+            stats[f'{speaker_A}_vocs_fp_{speaker_B}_true'] = mean_scores(
+                j, vtc[f'{speaker_A}_vocs_fp_{speaker_B}'], data, time_scale, range_onset, range_offset
+            )
 
     return stats
     
@@ -153,10 +162,12 @@ def generate_stats(parameters):
     return stats
     
 if __name__ == '__main__':
+    #annotators = pd.read_csv('input/annotators.csv')[:-3]
     annotators = pd.read_csv('input/annotators.csv')[:-3]
     annotators['path'] = annotators['corpus'].apply(lambda c: opj('input', c))
     stats = [generate_stats(annotator) for annotator in annotators.to_dict(orient = 'records')]
     stats = sum(stats, [])
+    stats = [s for s in stats if s is not None]
 
     combined = {}
 
@@ -176,6 +187,9 @@ if __name__ == '__main__':
             np.quantile(combined[k], 0.9),
             len(combined[k])
         )
+
+    with open('output/scores.pickle', 'wb') as fp:
+        pickle.dump(combined, fp, pickle.HIGHEST_PROTOCOL)
 
     speakers = ['CHI', 'OCH', 'FEM', 'MAL']
     colors = ['red', 'orange', 'green', 'blue']
@@ -263,6 +277,42 @@ if __name__ == '__main__':
     fig.savefig('output/scores.pdf')
     fig.savefig('output/scores.pgf')
 
+    plt.close(fig)
 
+    scores = np.zeros((len(speakers), len(stats)))
+    vocs = np.zeros((len(speakers), len(stats)))
+    truth = np.zeros((len(speakers), len(stats)))
+    tp = np.zeros((len(speakers), len(stats)))
+    r2 = np.zeros(len(speakers))
+    baseline = np.zeros(len(speakers))
 
+    for i, speaker in enumerate(speakers):
+        for j, s in enumerate(stats):
+            scores[i,j] = np.nansum(s[f'{speaker}_scores'])
+            tp[i,j] = len(s[f'{speaker}_vocs_explained'])
+            vocs[i,j] = len(s[f'{speaker}_scores'])
+            truth[i,j] = len(s[f'{speaker}_truth'])
+
+        r2[i] = np.corrcoef(scores[i,:],tp[i,:])[0,1]**2
+        baseline[i] = np.corrcoef(vocs[i,:],tp[i,:])[0,1]**2
+
+    print(r2)
+    print(baseline)
+
+    table = pd.DataFrame(np.array([r2, baseline]).T, columns = ['scores', 'vocs'])
+    table = table.assign(speaker = speakers)
+
+    table.to_latex(
+        'output/scores_as_predictor.tex',
+        columns = ['speaker', 'vocs', 'scores'],
+        index = False,
+        float_format = lambda x: f'{x:.2f}',
+        column_format = '|c|c|c|',
+        bold_rows = True,
+        label = 'table:scores_as_predictor',
+        caption = """
+        Squared pearson correlation ($R^2$) with the amount of true positive.
+        Scores alone are slightly better predictors than vocalization counts. 
+        """
+    )
 
