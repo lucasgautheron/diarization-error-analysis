@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import pandas as pd
+import pickle
 import numpy as np
 
 import argparse
@@ -24,18 +25,23 @@ def set_size(width, fraction=1, ratio = None):
     fig_height_in = fig_width_in * ratio
     return fig_width_in, fig_height_in
 
-parser = argparse.ArgumentParser(description = 'plot3')
-parser.add_argument('--group', type = int, default = None)
+parser = argparse.ArgumentParser(description = 'plot_pred')
+parser.add_argument('data')
+parser.add_argument('fit')
+parser.add_argument('output')
 args = parser.parse_args()
 
-fit = pd.read_parquet('fit.parquet')
+with open(args.data, 'rb') as fp:
+    data = pickle.load(fp)
+
+fit = pd.read_parquet(args.fit)
 
 fig = plt.figure(figsize=set_size(450, 1, 1))
 axes = [fig.add_subplot(4,4,i+1) for i in range(4*4)]
 
 speakers = ['CHI', 'OCH', 'FEM', 'MAL']
 
-n_groups = 5
+n_groups = data['n_groups']
 
 for i in range(4*4):
     ax = axes[i]
@@ -43,12 +49,13 @@ for i in range(4*4):
     col = i%4+1
     label = f'{row}.{col}'
 
-    if args.group is None:
-        data = np.hstack([fit[f'alphas.{k}.{label}']/(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,n_groups+1)])
-    else:
-        data = fit[f'alphas.{args.group}.{label}']/(fit[f'alphas.{args.group}.{label}']+fit[f'betas.{args.group}.{label}']).values
+    #if args.group is None:
+    #    data = np.hstack([fit[f'alphas.{k}.{label}']/(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,n_groups+1)])
+    #else:
+    #    data = fit[f'alphas.{args.group}.{label}']/(fit[f'alphas.{args.group}.{label}']+fit[f'betas.{args.group}.{label}']).values
     #data = np.hstack([(fit[f'group_mus.{k}.{label}']).values for k in range(1,59)])
-    #data = fit[f'mus.{label}'].values    
+    #data = fit[f'mus.{label}'].values
+    data = np.hstack([fit[f'probs.{k+1}.{label}'].values for k in range(n_groups)])
   
     ax.set_xticks([])
     ax.set_xticklabels([])
@@ -77,13 +84,10 @@ for i in range(4*4):
     ax.axvline(np.mean(data), linestyle = '--', linewidth = 0.5, color = '#333', alpha = 1)
     ax.text(0.5, 4.5, f'{low:.2f} - {high:.2f}', ha = 'center', va = 'center')
 
-fig.suptitle("$\mu_{eff}$ distribution")
+fig.suptitle("$p_{ij}$ distribution")
 fig.subplots_adjust(wspace = 0, hspace = 0)
 
-if args.group:
-    plt.savefig(f'mu_eff_{args.group}.pdf')
-else:
-    plt.savefig('mu_eff.pdf')
+plt.savefig(args.output)
 
 plt.show()
 

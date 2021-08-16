@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
+import argparse
+
 import pandas as pd
+import pickle
 import numpy as np
 
 import matplotlib
@@ -49,14 +52,23 @@ def set_size(width, fraction=1, ratio = None):
     return fig_width_in, fig_height_in
 
 
-fit = pd.read_parquet('fit.parquet')
+parser = argparse.ArgumentParser(description = 'plot_pred')
+parser.add_argument('data')
+parser.add_argument('fit')
+parser.add_argument('output')
+args = parser.parse_args()
+
+with open(args.data, 'rb') as fp:
+    data = pickle.load(fp)
+
+fit = pd.read_parquet(args.fit)
 
 fig = plt.figure(figsize=set_size(450, 1, 1))
 axes = [fig.add_subplot(4,4,i+1) for i in range(4*4)]
 
 speakers = ['CHI', 'OCH', 'FEM', 'MAL']
 
-n_groups = 5
+n_groups = data['n_groups']
 
 for i in range(4*4):
     ax = axes[i]
@@ -64,9 +76,9 @@ for i in range(4*4):
     col = i%4+1
     label = f'{row}.{col}'
 
-    mus = np.hstack([fit[f'alphas.{k}.{label}']/(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,n_groups+1)])
-    etas = np.hstack([(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,n_groups+1)])
-    etas = np.log10(etas)
+    #mus = np.hstack([fit[f'alphas.{k}.{label}']/(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,n_groups+1)])
+    #etas = np.hstack([(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,n_groups+1)])
+    #etas = np.log10(etas)
 
     ax.set_xticks([])
     ax.set_xticklabels([])
@@ -93,12 +105,12 @@ for i in range(4*4):
         ax.set_yticks(np.arange(1,3))
         ax.set_yticklabels([f'10$^{i}' for i in np.arange(1,3)])
 
-    #sns.kdeplot(fit[f'mus.{label}'], fit[f'etas.{label}'].apply(np.log), shade=True, cmap="viridis", ax = ax)
-    kplt = sns.kdeplot(mus, etas, shade=True, cmap="viridis", ax = ax)
+    kplt = sns.kdeplot(fit[f'mus.{label}'], fit[f'etas.{label}'].apply(np.log), shade=True, cmap="viridis", ax = ax)
+    #kplt = sns.kdeplot(mus, etas, shade=True, cmap="viridis", ax = ax)
     kplt.set(xlabel = None, ylabel = None)
-
+    ax.axvline(np.mean(fit[f'mus.{label}']), linestyle = '--', linewidth = 0.5, color = '#333', alpha = 1)
 
 fig.subplots_adjust(wspace = 0, hspace = 0)
-plt.savefig('density.pdf')
+plt.savefig(args.output)
 plt.show()
 

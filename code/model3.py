@@ -171,8 +171,10 @@ model {
 }
 
 generated quantities {
-    int pred[n_clips,n_classes];
+    int pred[n_clips,n_classes,n_classes];
     matrix[n_classes,n_classes] probs[n_groups];
+
+    matrix[n_classes,n_classes] log_lik[n_clips];
 
     for (c in 1:n_groups) {
         for (i in 1:n_classes) {
@@ -184,9 +186,10 @@ generated quantities {
 
     for (k in 1:n_clips) {
         for (i in 1:n_classes) {
-            pred[k,i] = 0;
             for (j in 1:n_classes) {
-                pred[k,i] += binomial_rng(truth[k,j], probs[group[k],i,j]); 
+                pred[k,i,j] = binomial_rng(truth[k,j], probs[group[k],i,j]);
+                log_lik[k,i,j] = beta_lpdf(probs[group[k],i,j] | alphas[i,j], betas[i,j]);
+                log_lik[k,i,j] += binomial_lpmf(vtc[k,i,j] | truth[k,j], probs[group[k],i,j]);
             }
         }
     }

@@ -28,6 +28,7 @@ def set_size(width, fraction=1, ratio = None):
 parser = argparse.ArgumentParser(description = 'plot_pred')
 parser.add_argument('data')
 parser.add_argument('fit')
+parser.add_argument('output')
 args = parser.parse_args()
 
 with open(args.data, 'rb') as fp:
@@ -36,22 +37,41 @@ with open(args.data, 'rb') as fp:
 fit = pd.read_parquet(args.fit)
 
 fig = plt.figure(figsize=set_size(450, 1, 1))
-axes = [fig.add_subplot(2,2,i+1) for i in range(4)]
+axes = [fig.add_subplot(4,4,i+1) for i in range(4*4)]
 
 speakers = ['CHI', 'OCH', 'FEM', 'MAL']
 
-n_values = data['n_validation']
+n_values = data['n_clips']
 
-for i in range(4):
+for i in range(4*4):
     ax = axes[i]
-    row = i//2+1
-    col = i%2+1
+    row = i//4+1
+    col = i%4+1
     
-    truth = data['truth'][:n_values,i]
-    vtc = np.sum(data['vtc'][:n_values,i,:], axis = 1)
-    pred = np.array([fit[f'pred.{k+1}.{i+1}'] for k in range(n_values)])
-    errors = np.quantile(pred, [(1-0.68)/2, 1-(1-0.68)/2], axis = 1)
-    pred = np.mean(pred, axis = 1)
+    truth = data['truth'][:n_values,row-1]
+    #vtc = np.sum(data['vtc'][:n_values,i,:], axis = 1)
+    vtc = np.array(data['vtc'][:n_values,col-1,row-1])
+    pred_dist = np.array([fit[f'pred.{k+1}.{col}.{row}'] for k in range(n_values)])
+    errors = np.quantile(pred_dist, [(1-0.68)/2, 1-(1-0.68)/2], axis = 1)
+    pred = np.mean(pred_dist, axis = 1)
+
+    # p = np.zeros(n_values)
+    # for k in range(n_values):
+    #     dy = np.abs(pred[k]-vtc[k])
+    #     more_extreme = pred_dist[k,np.abs(pred_dist[k,:]-pred[k])>dy]
+    #     p[k] = len(more_extreme)/pred_dist.shape[1]
+
+    # chi_squared = -2*np.nansum(np.ma.log(p))/n_values
+
+    # print(p.shape)
+    # print(p)
+    # print(chi_squared)
+
+    # log_lik = np.array([fit[f'log_lik.{k+1}.{i+1}.{i+1}'] for k in range(n_values)])
+    # print(log_lik)
+    # log_lik = np.mean(log_lik)
+    # print(log_lik)
+    # print(np.exp(log_lik))
 
     mask = (vtc > 0) & (pred > 0)
 
@@ -64,29 +84,45 @@ for i in range(4):
     slopes_x = np.logspace(0,3,num=3)
     ax.plot(slopes_x, slopes_x, color = '#ddd', lw = 0.5)
     ax.scatter(vtc[mask], pred[mask], s = 1)
-    ax.errorbar(vtc[mask], pred[mask], [pred[mask]-errors[0,mask],errors[1,mask]-pred[mask]], ls='none', elinewidth = 1)
+    ax.errorbar(vtc[mask], pred[mask], [pred[mask]-errors[0,mask],errors[1,mask]-pred[mask]], ls='none', elinewidth = 0.5)
     ax.scatter(vtc[(vtc > 0) & (truth > 0)], truth[(vtc > 0) & (truth > 0)], s = 0.5, color = 'red')
 
-    r2 = np.corrcoef(vtc, pred)[0,1]**2
-    baseline = np.corrcoef(vtc, truth)[0,1]**2
+    #r2 = np.corrcoef(vtc, pred)[0,1]**2
+    #baseline = np.corrcoef(vtc, truth)[0,1]**2
+    #print(speakers[i], r2, baseline)
+    #ax.text(2, 400, speakers[i], ha = 'left', va = 'center')
 
-    print(speakers[i], r2, baseline)
+    ax.set_xticks([])
+    ax.set_yticks([])
 
-    ax.text(2, 400, f'{speakers[i]}\n$R^2={r2:.2f}$\nbaseline = {baseline:.2f}', ha = 'left', va = 'center')
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
 
-    if col == 2:
+    if col == 4:
         ax.yaxis.tick_right()
 
-    ax.set_xticks([10**i for i in range(3)])
-    ax.set_yticks([10**i for i in range(3)])
+    if row == 1:
+        ax.xaxis.tick_top()
+        ax.set_xticks([10**1.5])
+        ax.set_xticklabels([speakers[col-1]])
 
-    ax.set_xticklabels([f'$10^{i}$' for i in range(3)])
-    ax.set_yticklabels([f'$10^{i}$' for i in range(3)])
+    if row == 4:
+        ax.set_xticks(np.power(10, np.arange(1,4)))
+        ax.set_xticklabels([f'10$^{i}$' for i in [1,2,3]])
 
+    if col == 1:
+        ax.set_yticks([10**1.5])
+        ax.set_yticklabels([speakers[row-1]])
+    
+    if col == 4:
+        ax.yaxis.tick_right()
+        ax.set_yticks(np.power(10, np.arange(1,4)))
+        ax.set_yticklabels([f'10$^{i}$' for i in [1,2,3]])
 
+plt.xlabel('')
 
 #fig.suptitle("$\mu_{eff}$ distribution")
 fig.subplots_adjust(wspace = 0, hspace = 0)
-plt.savefig('pred.pdf')
+plt.savefig(args.output)
 plt.show()
 
