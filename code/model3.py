@@ -128,7 +128,9 @@ data {
   int group[n_clips];
   int vtc[n_clips,n_classes,n_classes];
   int truth[n_clips,n_classes];
-  int n_validation;
+
+  int<lower=1> n_validation;
+  int<lower=1> n_sim;
 }
 
 parameters {
@@ -173,8 +175,12 @@ model {
 generated quantities {
     int pred[n_clips,n_classes,n_classes];
     matrix[n_classes,n_classes] probs[n_groups];
-
     matrix[n_classes,n_classes] log_lik[n_clips];
+
+    int sim_truth[n_sim,n_classes];
+    int sim_vtc[n_sim,n_classes];
+    vector[n_classes] lambdas;
+    real chi_adu_coef = uniform_rng(0,1);
 
     for (c in 1:n_groups) {
         for (i in 1:n_classes) {
@@ -190,6 +196,31 @@ generated quantities {
                 pred[k,i,j] = binomial_rng(truth[k,j], probs[group[k],i,j]);
                 log_lik[k,i,j] = beta_lpdf(probs[group[k],i,j] | alphas[i,j], betas[i,j]);
                 log_lik[k,i,j] += binomial_lpmf(vtc[k,i,j] | truth[k,j], probs[group[k],i,j]);
+            }
+        }
+    }
+
+    lambdas[1] = 1000;
+    lambdas[2] = 100;
+    lambdas[3] = 1000;
+    lambdas[4] = 100;
+
+    real lambda;
+    for (k in 1:n_sim) {
+        for (i in 2:n_classes) {
+            real factor = gamma_rng(4, 1);
+            sim_truth[k,i] = poisson_rng(lambdas[i]*factor);
+        }
+        real factor = gamma_rng(4, 1);
+        sim_truth[k,1] = poisson_rng(factor*lambdas[1] + chi_adu_coef*(sim_truth[k,3]+sim_truth[k,4]));
+    }
+
+    for (k in 1:n_sim) {
+        for (i in 1:n_classes) {
+            sim_vtc[k,i] = 0;
+            for (j in 1:n_classes) {
+                real p = beta_rng(alphas[i,j], betas[i,j]);
+                sim_vtc[k,i] += binomial_rng(sim_truth[k,j], p);
             }
         }
     }
@@ -215,6 +246,7 @@ if __name__ == "__main__":
         'n_classes': truth.shape[1],
         'n_groups': data[args.group].nunique(),
         'n_validation': int(truth.shape[0]*args.validation),
+        'n_sim': 100,
         'group': 1+data[args.group].astype('category').cat.codes.values,
         'truth': truth.astype(int),
         'vtc': vtc.astype(int)
@@ -232,4 +264,5 @@ if __name__ == "__main__":
     fit = posterior.sample(num_chains = args.chains, num_samples = args.samples)
     df = fit.to_frame()
     df.to_parquet('fit_model3.parquet')
+
 
