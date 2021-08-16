@@ -41,7 +41,7 @@ axes = [fig.add_subplot(4,4,i+1) for i in range(4*4)]
 
 speakers = ['CHI', 'OCH', 'FEM', 'MAL']
 
-n_values = data['n_clips']
+n_values = data['n_validation']
 
 for i in range(4*4):
     ax = axes[i]
@@ -125,4 +125,5 @@ plt.xlabel('')
 fig.subplots_adjust(wspace = 0, hspace = 0)
 plt.savefig(args.output)
 plt.show()
+
 
