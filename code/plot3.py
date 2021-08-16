@@ -47,7 +47,7 @@ for i in range(4*4):
     ax = axes[i]
     row = i//4+1
     col = i%4+1
-    label = f'{row}.{col}'
+    label = f'{col}.{row}'
 
     #if args.group is None:
     #    data = np.hstack([fit[f'alphas.{k}.{label}']/(fit[f'alphas.{k}.{label}']+fit[f'betas.{k}.{label}']).values for k in range(1,n_groups+1)])
@@ -80,7 +80,7 @@ for i in range(4*4):
         ax.set_yticks([2.5])
         ax.set_yticklabels([speakers[row-1]])
 
-    ax.hist(data, bins = np.linspace(0,1,40), density = True)
+    ax.hist(data, bins = np.linspace(0,1,40), density = True, histtype = 'step')
     ax.axvline(np.mean(data), linestyle = '--', linewidth = 0.5, color = '#333', alpha = 1)
     ax.text(0.5, 4.5, f'{low:.2f} - {high:.2f}', ha = 'center', va = 'center')
 
