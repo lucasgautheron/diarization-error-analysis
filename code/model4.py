@@ -23,6 +23,7 @@ parser = argparse.ArgumentParser(description = 'model4')
 parser.add_argument('--group', default = 'child', choices = ['corpus', 'child'])
 parser.add_argument('--chains', default = 4, type = int)
 parser.add_argument('--samples', default = 2000, type = int)
+parser.add_argument('--validation', default = 0, type = float)
 args = parser.parse_args()
 
 def extrude(self, removed, mode: str = 'intersection'):
@@ -127,6 +128,7 @@ data {
   int group[n_clips];
   int vtc[n_clips,n_classes,n_classes];
   int truth[n_clips,n_classes];
+  int n_validation;
 }
 
 parameters {
@@ -155,7 +157,7 @@ transformed parameters {
 }
 
 model {
-    for (k in 1:n_clips) {
+    for (k in n_validation:n_clips) {
         for (i in 1:n_classes) {
             for (j in 1:n_classes) {
                 vtc[k,i,j] ~ binomial(truth[k,j], group_confusion[group[k],j,i]);
@@ -202,10 +204,7 @@ generated quantities {
 
     for (k in 1:n_clips) {
         for (i in 1:n_classes) {
-            pred[k,i] = 0;
-            for (j in 1:n_classes) {
-                pred[k,i] += binomial_rng(truth[k,j], probs[group[k],i,j]); 
-            }
+            pred[k,i] = binomial_rng(truth[k,i], probs[group[k],i,i]);
         }
     }
 }
@@ -229,6 +228,7 @@ if __name__ == "__main__":
         'n_clips': truth.shape[0],
         'n_classes': truth.shape[1],
         'n_groups': data[args.group].nunique(),
+        'n_validation': int(truth.shape[0]*args.validation),
         'group': 1+data[args.group].astype('category').cat.codes.values,
         'truth': truth.astype(int),
         'vtc': vtc.astype(int)
