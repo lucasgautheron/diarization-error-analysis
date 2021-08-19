@@ -16,6 +16,8 @@ matplotlib.rcParams.update({
     'pgf.rcfonts': False,
 })
 
+from sklearn.linear_model import LinearRegression
+
 def set_size(width, fraction=1, ratio = None):
     fig_width_pt = width * fraction
     inches_per_pt = 1 / 72.27
@@ -40,6 +42,7 @@ fig = plt.figure(figsize=set_size(450, 1, 1))
 axes = [fig.add_subplot(4,4,i+1) for i in range(4*4)]
 
 speakers = ['CHI', 'OCH', 'FEM', 'MAL']
+colors = ['red', 'orange', 'green', 'blue']
 
 n_values = data['n_validation']
 
@@ -54,6 +57,10 @@ for i in range(4*4):
     pred_dist = np.array([fit[f'pred.{k+1}.{col}.{row}'] for k in range(n_values)])
     errors = np.quantile(pred_dist, [(1-0.68)/2, 1-(1-0.68)/2], axis = 1)
     pred = np.mean(pred_dist, axis = 1)
+
+    regr = LinearRegression()
+    regr.fit(truth.reshape(-1, 1), pred)
+
 
     # p = np.zeros(n_values)
     # for k in range(n_values):
@@ -73,7 +80,7 @@ for i in range(4*4):
     # print(log_lik)
     # print(np.exp(log_lik))
 
-    mask = (vtc > 0) & (pred > 0)
+    mask = (truth > 1) & (pred > 1)
 
     ax.set_xlim(1,1000)
     ax.set_ylim(1,1000)
@@ -82,10 +89,16 @@ for i in range(4*4):
     ax.set_yscale('log')
 
     slopes_x = np.logspace(0,3,num=3)
-    ax.plot(slopes_x, slopes_x, color = '#ddd', lw = 0.5)
-    ax.scatter(vtc[mask], pred[mask], s = 1)
-    ax.errorbar(vtc[mask], pred[mask], [pred[mask]-errors[0,mask],errors[1,mask]-pred[mask]], ls='none', elinewidth = 0.5)
-    ax.scatter(vtc[(vtc > 0) & (truth > 0)], truth[(vtc > 0) & (truth > 0)], s = 0.5, color = 'red')
+    ax.plot(slopes_x, regr.coef_[0]*slopes_x, color = '#ddd', lw = 0.75)
+    #ax.scatter(truth[mask], pred[mask], s = 1, color = 'black')
+    #ax.errorbar(truth[mask], pred[mask], [pred[mask]-errors[0,mask],errors[1,mask]-pred[mask]], ls='none', elinewidth = 0.25, color = '#333')
+
+    x = truth[mask]
+    y1 = np.maximum(errors[0,mask],1)
+    y2 = np.minimum(errors[1, mask], 1000)
+    srt = np.argsort(x)
+    ax.fill_between(x[srt], y1[srt], y2[srt], color = '#ccc', alpha = 0.5)
+    ax.scatter(truth[(vtc > 0) & (truth > 0)], vtc[(vtc > 0) & (truth > 0)], s = 1, color = colors[col-1])
 
     #r2 = np.corrcoef(vtc, pred)[0,1]**2
     #baseline = np.corrcoef(vtc, truth)[0,1]**2
@@ -125,5 +138,6 @@ plt.xlabel('')
 fig.subplots_adjust(wspace = 0, hspace = 0)
 plt.savefig(args.output)
 plt.show()
+
 
 
