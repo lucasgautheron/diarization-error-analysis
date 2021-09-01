@@ -131,6 +131,9 @@ data {
 
   int<lower=1> n_validation;
   int<lower=1> n_sim;
+
+  real<lower=0> rates_alphas[n_classes];
+  real<lower=0> rates_betas[n_classes];
 }
 
 parameters {
@@ -180,7 +183,14 @@ generated quantities {
     int sim_truth[n_sim,n_classes];
     int sim_vtc[n_sim,n_classes];
     vector[n_classes] lambdas;
-    real chi_adu_coef = uniform_rng(0,1);
+    real chi_adu_coef;
+
+    if (uniform_rng(0,1) > 0.2) {
+        chi_adu_coef = uniform_rng(0,1);
+    }
+    else {
+        chi_adu_coef = 0;
+    }
 
     for (c in 1:n_groups) {
         for (i in 1:n_classes) {
@@ -200,19 +210,14 @@ generated quantities {
         }
     }
 
-    lambdas[1] = 1000;
-    lambdas[2] = 100;
-    lambdas[3] = 1000;
-    lambdas[4] = 100;
-
     real lambda;
     for (k in 1:n_sim) {
         for (i in 2:n_classes) {
-            real factor = gamma_rng(4, 1);
-            sim_truth[k,i] = poisson_rng(lambdas[i]*factor);
+            lambda = gamma_rng(rates_alphas[i], rates_betas[i]);
+            sim_truth[k,i] = poisson_rng(lambda);
         }
-        real factor = gamma_rng(4, 1);
-        sim_truth[k,1] = poisson_rng(factor*lambdas[1] + chi_adu_coef*(sim_truth[k,3]+sim_truth[k,4]));
+        lambda = gamma_rng(rates_alphas[1], rates_betas[1]);
+        sim_truth[k,1] = poisson_rng(lambda + chi_adu_coef*(sim_truth[k,3]+sim_truth[k,4]));
     }
 
     for (k in 1:n_sim) {
@@ -241,6 +246,8 @@ if __name__ == "__main__":
 
     print(vtc.shape)
 
+    rates = pd.read_csv('output/speech_dist.csv')
+
     data = {
         'n_clips': truth.shape[0],
         'n_classes': truth.shape[1],
@@ -249,7 +256,9 @@ if __name__ == "__main__":
         'n_sim': 100,
         'group': 1+data[args.group].astype('category').cat.codes.values,
         'truth': truth.astype(int),
-        'vtc': vtc.astype(int)
+        'vtc': vtc.astype(int),
+        'rates_alphas': rates['alpha'].values,
+        'rates_betas': rates['beta'].values
     }
 
     print(f"clips: {data['n_clips']}")
