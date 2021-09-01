@@ -69,17 +69,17 @@ for i in range(len(fit)):
 
 
 fig, ax = plt.subplots(1,2,figsize=set_size(450,1,0.5))
-ax[0].hist(sim_beta_adu, histtype = 'step', bins = 20, density = True, label = '$\\mathrm{CHI} = \\beta \\mathrm{ADU} + \\beta_0$')
-ax[0].hist(sim_beta_och, histtype = 'step', bins = 20, density = True, label = '$\\mathrm{CHI} = \\beta \\mathrm{OCH} + \\beta_0$')
-ax[0].set_xlabel('$\\hat{\\beta}$')
-ax[0].set_ylabel('$p(\\hat{\\beta}|\\beta=0)$')
+ax[0].hist(sim_beta_adu, histtype = 'step', bins = 20, density = True, label = '$\\mathrm{CHI} = K \\mathrm{ADU} + I$')
+ax[0].hist(sim_beta_och, histtype = 'step', bins = 20, density = True, label = '$\\mathrm{CHI} = K \\mathrm{OCH} + I$')
+ax[0].set_xlabel('$\\hat{K}$')
+ax[0].set_ylabel('$p(\\hat{K}|K=0)$')
 ax[0].legend(loc = 'upper left', bbox_to_anchor=[0, 1.25], frameon=False)
-ax[0].set_xlim(-2,2)
+ax[0].set_xlim(-1,1)
 
 ax[1].hist(sim_r_adu, histtype = 'step', bins = 20, density = True, label = '$R(\\mathrm{CHI},\\mathrm{ADU})$')
 ax[1].hist(sim_r_och, histtype = 'step', bins = 20, density = True, label = '$R(\\mathrm{CHI},\\mathrm{OCH})$')
 ax[1].set_xlabel('$R$')
-ax[1].set_ylabel('$p(R|\\beta=0)$')
+ax[1].set_ylabel('$p(R|K=0)$')
 ax[1].legend(loc = 'upper left', bbox_to_anchor=[0, 1.25], frameon=False)
 ax[1].set_xlim(-1,1)
 
